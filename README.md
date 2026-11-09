@@ -12,7 +12,8 @@ EDITFLOW AI is a web-first, story-aware editing system for faceless documentary,
 - Optimistic concurrency control to prevent stale writes.
 - Restore as a new revision, preserving all later history.
 - Version comparison with clip-level change summaries.
-- Render jobs pinned to an immutable timeline version.
+- Render jobs pinned to an immutable timeline version, with a database-enforced snapshot/hash lock.
+- PostgreSQL worker claiming with `FOR UPDATE SKIP LOCKED` and render lifecycle tracking.
 - Asset retention references for historical timelines.
 
 ## Repository status
@@ -31,4 +32,4 @@ This repository is being built incrementally from the engineering baseline. The 
 
 ## Development
 
-Run `docker compose up --build` to start PostgreSQL and the API; the container applies Alembic migrations before API startup. See `docs/engineering/REVISION_HISTORY.md` for guarantees and remaining gaps.
+Run `docker compose up --build` to start PostgreSQL and the API; the container applies Alembic migrations before API startup. See `docs/engineering/REVISION_HISTORY.md` and `docs/engineering/RENDER_PIPELINE.md` for guarantees and remaining gaps.
