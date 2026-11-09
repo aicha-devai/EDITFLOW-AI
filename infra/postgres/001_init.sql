@@ -24,8 +24,7 @@ CREATE TABLE IF NOT EXISTS timeline_versions (
     restored_from_version_id UUID NULL REFERENCES timeline_versions(id),
     message TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    CONSTRAINT uq_timeline_version_number UNIQUE(project_id, version),
-    CONSTRAINT uq_timeline_version_hash UNIQUE(project_id, content_hash)
+    CONSTRAINT uq_timeline_version_number UNIQUE(project_id, version)
 );
 
 ALTER TABLE projects
@@ -42,3 +41,5 @@ CREATE TABLE IF NOT EXISTS timeline_asset_references (
 
 CREATE INDEX IF NOT EXISTS ix_timeline_versions_project_version
     ON timeline_versions(project_id, version DESC);
+CREATE INDEX IF NOT EXISTS ix_timeline_versions_content_hash
+    ON timeline_versions(project_id, content_hash);
