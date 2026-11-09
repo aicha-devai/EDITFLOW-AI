@@ -76,7 +76,7 @@ async def verify_output_decode(
         raise ValueError("timeout_seconds must be between 1 and 21600")
     argv = (
         "ffmpeg", "-hide_banner", "-nostdin", "-v", "error", "-xerror",
-        "-i", output_path, "-map", "0:v?", "-map", "0:a?", "-f", "null", "-",
+        "-err_detect", "explode", "-i", output_path, "-map", "0:v?", "-map", "0:a?", "-f", "null", "-",
     )
     try:
         process = await asyncio.create_subprocess_exec(
