@@ -35,6 +35,31 @@ async def _maintain_lease(sessions, job_id, lease_token, lease_seconds: int) -> 
         logger.debug("Heartbeat renewed for job %s", job_id)
 
 
+async def _run_with_lease(render_coro, heartbeat_coro):
+    """Keep rendering supervised; lease loss/cancellation stops the encode task."""
+    render_task = asyncio.create_task(render_coro)
+    heartbeat_task = asyncio.create_task(heartbeat_coro)
+    try:
+        done, _ = await asyncio.wait(
+            {render_task, heartbeat_task},
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        if heartbeat_task in done:
+            try:
+                await heartbeat_task
+            except BaseException:
+                render_task.cancel()
+                await asyncio.gather(render_task, return_exceptions=True)
+                raise
+            raise RuntimeError("Render lease heartbeat exited unexpectedly")
+        return await render_task
+    finally:
+        for task in (render_task, heartbeat_task):
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(render_task, heartbeat_task, return_exceptions=True)
+
+
 async def run_worker() -> None:
     engine = create_async_engine(settings.database_url, pool_pre_ping=True)
     sessions = async_sessionmaker(engine, expire_on_commit=False)
@@ -66,10 +91,8 @@ async def run_worker() -> None:
                 continue
 
             logger.info("Rendering job %s attempt lease acquired", job_id)
-            heartbeat_task = asyncio.create_task(
-                _maintain_lease(sessions, job_id, lease_token, lease_seconds)
-            )
-            try:
+
+            async def render():
                 async with sessions() as session:
                     async with session.begin():
                         result = await render_claimed_job(
@@ -77,12 +100,19 @@ async def run_worker() -> None:
                             timeout_seconds=timeout_seconds, lease_token=lease_token,
                             session_factory=sessions,
                         )
-                        logger.info("Job %s finished status=%s progress=%s", job_id, result.status, result.progress_percent)
+                        logger.info(
+                            "Job %s finished status=%s progress=%s",
+                            job_id, result.status, result.progress_percent,
+                        )
+                        return result
+
+            try:
+                await _run_with_lease(
+                    render(),
+                    _maintain_lease(sessions, job_id, lease_token, lease_seconds),
+                )
             except (LeaseLost, RenderCancelled) as exc:
                 logger.warning("Job %s worker lease/cancellation ended: %s", job_id, exc)
-            finally:
-                heartbeat_task.cancel()
-                await asyncio.gather(heartbeat_task, return_exceptions=True)
     finally:
         await engine.dispose()
 
