@@ -18,7 +18,7 @@ from app.media_probe import MediaProbeError, probe_media
 from app.models import Asset, RenderJob
 from app.render_engine import build_ffmpeg_plan
 from app.render_executor import execute_ffmpeg_plan
-from app.rendering import complete_render_job, fail_render_job
+from app.rendering import complete_render_job, fail_render_job, LeaseLost, RenderCancelled
 from app.storage import LocalObjectStorage
 
 
@@ -32,6 +32,7 @@ async def render_claimed_job(
     storage: LocalObjectStorage,
     work_root: str | Path,
     timeout_seconds: int = 3600,
+    lease_token: UUID | None = None,
 ) -> RenderJob:
     """Resolve pinned assets, probe, render and store one already-claimed job."""
     job = await session.scalar(select(RenderJob).where(RenderJob.id == job_id))
@@ -40,16 +41,19 @@ async def render_claimed_job(
     if job.status != "running":
         raise RenderWorkerError(f"Job must be running, got {job.status}")
 
+    lease_token = lease_token or job.lease_token
+    if lease_token is None or job.lease_token != lease_token:
+        raise LeaseLost("Render worker has no valid lease token")
     snapshot = job.timeline_snapshot
     clips = list(snapshot.get("clips") or [])
     if not clips:
-        await fail_render_job(session, job_id, "Timeline contains no clips")
+        await fail_render_job(session, job_id, "Timeline contains no clips", lease_token)
         return job
 
     try:
         asset_ids = {UUID(str(clip["asset_id"])) for clip in clips}
     except (KeyError, ValueError, TypeError) as exc:
-        await fail_render_job(session, job_id, f"Invalid clip asset reference: {exc}")
+        await fail_render_job(session, job_id, f"Invalid clip asset reference: {exc}", lease_token)
         return job
 
     assets = (await session.scalars(
@@ -61,7 +65,7 @@ async def render_claimed_job(
     asset_by_id = {asset.id: asset for asset in assets}
     missing = asset_ids - set(asset_by_id)
     if missing:
-        await fail_render_job(session, job_id, "Timeline references missing or foreign-project assets")
+        await fail_render_job(session, job_id, "Timeline references missing or foreign-project assets", lease_token)
         return job
 
     root = Path(work_root).resolve()
@@ -102,9 +106,11 @@ async def render_claimed_job(
                 asset_has_audio=media_audio,
             )
             await execute_ffmpeg_plan(plan, timeout_seconds=timeout_seconds)
-            object_key = f"renders/{job.project_id}/{job.id}.mp4"
+            object_key = f"renders/{job.project_id}/{job.id}/attempt-{job.attempts}.mp4"
             await asyncio.to_thread(storage.put_file, output_path, object_key)
-            return await complete_render_job(session, job_id, object_key)
+            return await complete_render_job(session, job_id, object_key, lease_token)
+    except (LeaseLost, RenderCancelled):
+        raise
     except Exception as exc:
-        await fail_render_job(session, job_id, str(exc) or exc.__class__.__name__)
+        await fail_render_job(session, job_id, str(exc) or exc.__class__.__name__, lease_token)
         return await session.scalar(select(RenderJob).where(RenderJob.id == job_id))
