@@ -17,7 +17,7 @@ EDITFLOW AI is a web-first, story-aware editing system for faceless documentary,
 
 ## Repository status
 
-This repository was created as an empty repository and is being initialized from the engineering baseline. Features are not considered complete until implemented and tested against PostgreSQL.
+This repository is being built incrementally from the engineering baseline. The current backend slice includes PostgreSQL-backed timeline versioning, immutable history, optimistic concurrency, Alembic migrations, and integration tests. It is not yet production-ready.
 
 ## Planned stack
 
@@ -31,4 +31,4 @@ This repository was created as an empty repository and is being initialized from
 
 ## Development
 
-The first backend slice will establish the versioning domain, persistence model, API contracts, and PostgreSQL integration tests. See `docs/engineering/REVISION_HISTORY.md` for the design and acceptance criteria.
+Run `docker compose up --build` to start PostgreSQL and the API; the container applies Alembic migrations before API startup. See `docs/engineering/REVISION_HISTORY.md` for guarantees and remaining gaps.
