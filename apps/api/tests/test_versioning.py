@@ -129,3 +129,44 @@ async def test_failed_asset_validation_rolls_back_revision(db_session):
         select(func.count()).select_from(TimelineVersion).where(TimelineVersion.project_id == project.id)
     )
     assert count == 0
+
+
+@pytest.mark.asyncio
+async def test_two_concurrent_writers_serialize_on_project_lock(db_session):
+    import asyncio
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+
+    project = Project(title="Concurrent writers")
+    db_session.add(project)
+    await db_session.flush()
+    project_id = project.id
+    initial = TimelineDocument(project_id=project_id, sequence={"revision": 1})
+    await save_timeline(db_session, project_id, initial, expected_version=0)
+    await db_session.commit()
+
+    factory = async_sessionmaker(db_session.bind, expire_on_commit=False)
+
+    async def writer(revision: int):
+        timeline = TimelineDocument(project_id=project_id, sequence={"revision": revision})
+        async with factory() as session:
+            try:
+                async with session.begin():
+                    row, created = await save_timeline(
+                        session, project_id, timeline, expected_version=1
+                    )
+                    assert created is True
+                    return ("saved", row.version)
+            except VersionConflict:
+                return ("conflict", None)
+
+    outcomes = await asyncio.gather(writer(2), writer(3))
+    assert sorted(result[0] for result in outcomes) == ["conflict", "saved"]
+    saved_versions = [result[1] for result in outcomes if result[0] == "saved"]
+    assert saved_versions == [2]
+
+    async with factory() as verify:
+        count = await verify.scalar(
+            select(func.count()).select_from(TimelineVersion)
+            .where(TimelineVersion.project_id == project_id)
+        )
+        assert count == 2
