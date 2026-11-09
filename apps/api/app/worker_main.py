@@ -9,7 +9,7 @@ from pathlib import Path
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.config import settings
-from app.rendering import claim_next_render_job
+from app.rendering import claim_next_render_job, heartbeat_render_job, LeaseLost, RenderCancelled
 from app.render_worker import render_claimed_job
 from app.storage import create_object_storage
 
@@ -21,42 +21,67 @@ logging.basicConfig(
 logger = logging.getLogger("editflow.worker")
 
 
+async def _maintain_lease(sessions, job_id, lease_token, lease_seconds: int) -> None:
+    interval = max(2, lease_seconds // 3)
+    progress = 5
+    while True:
+        await asyncio.sleep(interval)
+        async with sessions() as session:
+            async with session.begin():
+                await heartbeat_render_job(
+                    session, job_id, lease_token, lease_seconds=lease_seconds,
+                    progress_percent=progress,
+                )
+        logger.debug("Heartbeat renewed for job %s", job_id)
+
+
 async def run_worker() -> None:
     engine = create_async_engine(settings.database_url, pool_pre_ping=True)
     sessions = async_sessionmaker(engine, expire_on_commit=False)
     work_root = Path(os.getenv("EDITFLOW_WORK_ROOT", "/tmp/editflow-work"))
     poll_seconds = float(os.getenv("WORKER_POLL_SECONDS", "2"))
     timeout_seconds = int(os.getenv("RENDER_TIMEOUT_SECONDS", "3600"))
+    lease_seconds = int(os.getenv("RENDER_LEASE_SECONDS", "120"))
+    if lease_seconds < 15:
+        raise ValueError("RENDER_LEASE_SECONDS must be at least 15")
     storage = create_object_storage(settings)
     work_root.mkdir(parents=True, exist_ok=True)
 
-    logger.info("Render worker started; storage backend=%s", settings.storage_backend)
+    logger.info("Render worker started; storage backend=%s lease=%ss", settings.storage_backend, lease_seconds)
     try:
         while True:
             job_id = None
+            lease_token = None
             async with sessions() as session:
                 async with session.begin():
-                    job = await claim_next_render_job(session)
+                    job = await claim_next_render_job(session, lease_seconds=lease_seconds)
                     if job is not None and job.status == "running":
                         job_id = job.id
+                        lease_token = job.lease_token
                     elif job is not None:
-                        logger.error("Job %s failed pinned snapshot validation", job.id)
+                        logger.error("Job %s closed during claim validation: %s", job.id, job.status)
 
             if job_id is None:
                 await asyncio.sleep(poll_seconds)
                 continue
 
-            logger.info("Rendering job %s", job_id)
-            async with sessions() as session:
-                async with session.begin():
-                    result = await render_claimed_job(
-                        session,
-                        job_id,
-                        storage,
-                        work_root,
-                        timeout_seconds=timeout_seconds,
-                    )
-                    logger.info("Job %s finished with status=%s", job_id, result.status)
+            logger.info("Rendering job %s attempt lease acquired", job_id)
+            heartbeat_task = asyncio.create_task(
+                _maintain_lease(sessions, job_id, lease_token, lease_seconds)
+            )
+            try:
+                async with sessions() as session:
+                    async with session.begin():
+                        result = await render_claimed_job(
+                            session, job_id, storage, work_root,
+                            timeout_seconds=timeout_seconds, lease_token=lease_token,
+                        )
+                        logger.info("Job %s finished status=%s progress=%s", job_id, result.status, result.progress_percent)
+            except (LeaseLost, RenderCancelled) as exc:
+                logger.warning("Job %s worker lease/cancellation ended: %s", job_id, exc)
+            finally:
+                heartbeat_task.cancel()
+                await asyncio.gather(heartbeat_task, return_exceptions=True)
     finally:
         await engine.dispose()
 
