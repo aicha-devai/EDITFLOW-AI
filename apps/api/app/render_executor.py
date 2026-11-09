@@ -47,6 +47,11 @@ async def execute_ffmpeg_plan(
         process.kill()
         await process.communicate()
         raise RenderExecutionError(f"FFmpeg exceeded its {timeout_seconds}s execution timeout") from None
+    except asyncio.CancelledError:
+        # A cancellation or lost lease must not leave an orphaned encoder running.
+        process.kill()
+        await process.communicate()
+        raise
 
     stderr_text = (stderr or b"").decode("utf-8", errors="replace")
     if process.returncode != 0:
