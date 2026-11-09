@@ -156,7 +156,6 @@ async def heartbeat_render_job(
         raise LeaseLost("Worker lease is no longer valid")
     if job.cancel_requested:
         raise RenderCancelled("Render cancellation was requested")
-    now = datetime.now(timezone.utc)
     job.heartbeat_at = now
     job.lease_expires_at = now + timedelta(seconds=lease_seconds)
     if progress_percent is not None:
