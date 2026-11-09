@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.media_probe import probe_media
 from app.models import Asset, RenderJob
 from app.render_engine import build_ffmpeg_plan
-from app.render_executor import execute_ffmpeg_plan
+from app.render_executor import execute_ffmpeg_plan, verify_output_decode
 from app.output_integrity import validate_render_output
 from app.rendering import complete_render_job, fail_render_job, heartbeat_render_job, LeaseLost, RenderCancelled
 from app.storage import LocalObjectStorage
@@ -95,6 +95,8 @@ async def render_claimed_job(
             # A zero exit code is not sufficient: ffprobe must decode valid MP4 metadata.
             output_info = await probe_media(str(output_path))
             validate_render_output(output_path, plan, output_info)
+            # Decode every video/audio stream end-to-end; do not publish if any frame/packet fails.
+            await verify_output_decode(str(output_path), timeout_seconds=timeout_seconds)
             await _report_progress(session_factory, job_id, lease_token, 90)
             object_key = f"renders/{job.project_id}/{job.id}/attempt-{job.attempts}.mp4"
             await asyncio.to_thread(storage.put_file, output_path, object_key)
