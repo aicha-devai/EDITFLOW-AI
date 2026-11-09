@@ -78,7 +78,8 @@ async def test_compare_reports_changed_timeline_fields(db_session):
     await save_timeline(db_session, project.id, timeline_a, 0)
     await save_timeline(db_session, project.id, timeline_b, 1)
     result = await compare_versions(db_session, project.id, 1, 2)
-    # Current comparison reports clip-level differences; sequence-level diff is a known follow-up.
     assert result["added"] == []
     assert result["removed"] == []
     assert result["changed"] == []
+    assert result["sequence_changes"] == {"fps": {"before": 24, "after": 60}}
+    assert result["editorial_notes_changed"] is False
