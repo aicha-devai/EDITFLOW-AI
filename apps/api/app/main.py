@@ -1,11 +1,10 @@
 from uuid import UUID
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 from app.config import settings
 from app.db import get_db
-from app.models import Project, TimelineVersion
-from app.schemas import SaveTimelineRequest, RestoreRequest
+from app.models import Project
+from app.schemas import ProjectCreate, SaveTimelineRequest, RestoreRequest
 from app.versioning import (
     save_timeline, list_versions, compare_versions, restore_version,
     VersionConflict, ProjectNotFound,
@@ -16,6 +15,14 @@ app = FastAPI(title=settings.api_title, version="0.1.0")
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+@app.post("/v1/projects", status_code=201)
+async def create_project(payload: ProjectCreate, db: AsyncSession = Depends(get_db)):
+    project = Project(title=payload.title.strip())
+    db.add(project)
+    await db.commit()
+    await db.refresh(project)
+    return {"id": str(project.id), "title": project.title, "current_version_id": None}
 
 @app.post("/v1/projects/{project_id}/timeline")
 async def save_project_timeline(project_id: UUID, payload: SaveTimelineRequest, db: AsyncSession = Depends(get_db)):
