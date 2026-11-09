@@ -2,6 +2,9 @@ from typing import Any
 from uuid import UUID
 from pydantic import BaseModel, Field, ConfigDict
 
+class ProjectCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+
 class TimelineClip(BaseModel):
     model_config = ConfigDict(extra="forbid")
     id: UUID
