@@ -135,11 +135,16 @@ async def compare_versions(session: AsyncSession, project_id: uuid.UUID, from_ve
         if before_doc.get("sequence", {}).get(key) != after_doc.get("sequence", {}).get(key)
     }
     editorial_notes_changed = before_doc.get("editorial_notes", []) != after_doc.get("editorial_notes", [])
+    before_qc_intent = before_doc.get("qc_intent", [])
+    after_qc_intent = after_doc.get("qc_intent", [])
+    qc_intent_changes = None if before_qc_intent == after_qc_intent else {
+        "before": before_qc_intent, "after": after_qc_intent,
+    }
     return {
         "from_version": from_version, "to_version": to_version,
         "added": added, "removed": removed, "changed": changed,
         "sequence_changes": sequence_changes,
-        "editorial_notes_changed": editorial_notes_changed,
+        "editorial_notes_changed": editorial_notes_changed,\n        "qc_intent_changes": qc_intent_changes,
     }
 
 async def restore_version(session: AsyncSession, project_id: uuid.UUID, source_version: int, expected_version: int, message: str | None = None):
