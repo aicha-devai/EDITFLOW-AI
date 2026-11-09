@@ -99,7 +99,7 @@ Checks currently include:
 
 Every finding includes a stable code, severity, message, and time range or measurement when available. The report has a `passed` or `warnings` status plus aggregate counts. These are advisory signals, not automatic render failures: black frames, frozen holds, and silence can be deliberate storytelling choices. The user/editor can review and correct them. A failure to run the QC subprocess itself is recorded as a render-attempt error under the normal retry policy; it is never silently treated as a clean report.
 
-Migration `0004_render_quality_report` adds nullable JSONB storage for the report. Older render jobs naturally return `quality_report: null`. QC thresholds are currently worker defaults and are not yet configurable per project or timeline segment. Intent-aware allow-lists, loudness/true-peak standards (EBU R128), stereo phase checks, and visual artifact/blur detection remain future work.
+Migration `0004_render_quality_report` adds nullable JSONB storage for the report. Older render jobs naturally return `quality_report: null`. QC thresholds are currently worker defaults and are not yet configurable per project or timeline segment. Loudness/true-peak standards (EBU R128), stereo phase checks, and visual artifact/blur detection remain future work.
 
 
 ### Intent-aware QC annotations
@@ -136,7 +136,7 @@ Example timeline fragment:
 }
 ```
 
-Annotations are part of the immutable timeline snapshot and therefore pinned to the render job. A finding is classified as intentional only when its event type matches and its detected time range is fully contained within the annotation. The report retains the finding, but changes its severity from `warning` to `info`, adds `intentional: true` and the supplied reason, and excludes it from the warning count. Unmatched or non-overlapping events remain warnings. This is deterministic user/editor-provided intent, not an AI inference; automatic intent prediction is not enabled. Reports use `intentional_only` when all detected events are explicitly annotated.
+Annotations are part of the immutable timeline snapshot and therefore pinned to the render job. A finding is classified as intentional only when its event type matches and its detected time range is fully contained within the annotation. The report retains the finding, but changes its severity from `warning` to `info`, adds `intentional: true` and the supplied reason, and excludes it from the warning count. Unmatched or non-overlapping events remain warnings. Intent annotations remain user/editor-approved data; the QC worker never invents or applies them automatically. The QC Critic can propose candidate annotations for review, as described below. Reports use `intentional_only` when all detected events are explicitly annotated.
 
 
 ## AI QC Critic — proposal and approval workflow
