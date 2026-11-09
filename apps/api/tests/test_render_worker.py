@@ -60,5 +60,5 @@ async def test_worker_renders_pinned_snapshot_and_stores_output(db_session, tmp_
     )
 
     assert finished.status == "succeeded"
-    assert finished.output_object_key == f"renders/{project.id}/{job.id}.mp4"
+    assert finished.output_object_key == f"renders/{project.id}/{job.id}/attempt-1.mp4"
     assert storage._resolve(finished.output_object_key).read_bytes() == b"rendered-video"
