@@ -112,7 +112,7 @@ async def analyze_render_quality(
                 "peak_dbfs": round(max(finite_peaks), 2),
             })
 
-    # Explicit timeline annotations suppress only matching event types and overlapping ranges.
+    # Explicit timeline annotations suppress only matching event types fully covered by the declared range.
     # Keep the diagnostic visible in the report, but downgrade it to informational.
     annotations = intent_annotations or []
     for finding in findings:
@@ -124,7 +124,7 @@ async def analyze_render_quality(
         for annotation in annotations:
             if annotation.get("kind") != finding["code"]:
                 continue
-            if float(annotation["start_seconds"]) <= event_end and float(annotation["end_seconds"]) >= float(start):
+            if float(annotation["start_seconds"]) <= float(start) and float(annotation["end_seconds"]) >= event_end:
                 finding["intentional"] = True
                 finding["severity"] = "info"
                 finding["classification"] = "intentional"
