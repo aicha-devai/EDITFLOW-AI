@@ -63,3 +63,9 @@ class CreateRenderRequest(BaseModel):
     timeline_version: int | None = Field(default=None, ge=1)
     render_profile: dict[str, Any] = Field(default_factory=dict)
     request_key: str | None = Field(default=None, max_length=128)
+
+
+class QCCriticApprovalRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    proposal_ids: list[str] = Field(min_length=1, max_length=100)
+    expected_version: int = Field(ge=1)
