@@ -74,3 +74,34 @@ async def test_real_ffmpeg_decode_scan_rejects_corrupt_input(tmp_path):
     corrupt.write_bytes(b"this is not a decodable media file")
     with pytest.raises(RenderExecutionError, match="decode verification failed"):
         await verify_output_decode(str(corrupt), timeout_seconds=10)
+
+
+@pytest.mark.asyncio
+async def test_real_ffmpeg_perceptual_qc_detects_black_freeze_and_silence(tmp_path):
+    if not shutil.which("ffmpeg"):
+        pytest.skip("FFmpeg perceptual QC integration test requires ffmpeg")
+    from app.perceptual_qc import analyze_render_quality
+
+    sample = tmp_path / "qc-sample.mp4"
+    subprocess.run(
+        [
+            "ffmpeg", "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
+            "-f", "lavfi", "-i", "color=c=black:s=160x120:r=10:d=1",
+            "-f", "lavfi", "-i", "color=c=blue:s=160x120:r=10:d=3",
+            "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=44100:duration=1",
+            "-filter_complex",
+            "[0:v][1:v]concat=n=2:v=1:a=0[v];[2:a]apad=pad_dur=3[a]",
+            "-map", "[v]", "-map", "[a]", "-t", "4",
+            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac",
+            str(sample),
+        ],
+        check=True, capture_output=True, timeout=30,
+    )
+    report = await analyze_render_quality(
+        str(sample), includes_audio=True, black_min_duration=0.4,
+        freeze_min_duration=1.5, silence_min_duration=0.5,
+    )
+    codes = {item["code"] for item in report["findings"]}
+    assert "black_segment" in codes
+    assert "frozen_scene" in codes
+    assert "audio_silence" in codes
