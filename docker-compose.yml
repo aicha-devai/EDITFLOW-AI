@@ -19,10 +19,29 @@ services:
       context: ./apps/api
     environment:
       DATABASE_URL: postgresql+asyncpg://editflow:editflow@postgres:5432/editflow
+      EDITFLOW_STORAGE_ROOT: /var/lib/editflow
     ports:
       - "8000:8000"
+    volumes:
+      - editflow_storage:/var/lib/editflow
+    depends_on:
+      postgres:
+        condition: service_healthy
+  render-worker:
+    build:
+      context: ./apps/api
+    command: ["python", "-m", "app.worker_main"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://editflow:editflow@postgres:5432/editflow
+      EDITFLOW_STORAGE_ROOT: /var/lib/editflow
+      EDITFLOW_WORK_ROOT: /tmp/editflow-work
+      WORKER_POLL_SECONDS: "2"
+      RENDER_TIMEOUT_SECONDS: "3600"
+    volumes:
+      - editflow_storage:/var/lib/editflow
     depends_on:
       postgres:
         condition: service_healthy
 volumes:
   editflow_postgres:
+  editflow_storage:
