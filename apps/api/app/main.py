@@ -137,3 +137,50 @@ async def cancel_project_render(project_id: UUID, job_id: UUID, db: AsyncSession
         }
     except RenderJobNotFound:
         raise HTTPException(404, "Render job not found")
+
+
+@app.get("/v1/projects/{project_id}/renders/{job_id}/qc-critic")
+async def get_qc_critic_suggestions(project_id: UUID, job_id: UUID, db: AsyncSession = Depends(get_db)):
+    job = await db.scalar(select(RenderJob).where(
+        RenderJob.id == job_id, RenderJob.project_id == project_id
+    ))
+    if job is None:
+        raise HTTPException(404, "Render job not found")
+    if job.status != "succeeded":
+        raise HTTPException(409, "QC Critic suggestions are available only after a successful render")
+    return {
+        "job_id": str(job.id),
+        "timeline_version_id": str(job.timeline_version_id),
+        **generate_qc_critic_proposals(job.quality_report, job.timeline_snapshot),
+    }
+
+
+@app.post("/v1/projects/{project_id}/renders/{job_id}/qc-critic/approve")
+async def approve_qc_critic_suggestions(
+    project_id: UUID, job_id: UUID, payload: QCCriticApprovalRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        async with db.begin():
+            row, created, approved_count = await approve_qc_intent_proposals(
+                db, project_id, job_id, payload.proposal_ids, payload.expected_version
+            )
+        return {
+            "created": created,
+            "approved_count": approved_count,
+            "version": row.version,
+            "version_id": str(row.id),
+            "content_hash": row.content_hash,
+            "message": "Approved intent annotations were saved as a new immutable timeline version."
+            if created else "The approved annotations already match the current timeline.",
+        }
+    except QCCriticNotFound:
+        raise HTTPException(404, "Render job not found")
+    except QCCriticNotReady:
+        raise HTTPException(409, "QC Critic approval requires a succeeded render with a QC report")
+    except StaleQCCriticBase as exc:
+        raise HTTPException(409, str(exc))
+    except VersionConflict as exc:
+        raise HTTPException(409, str(exc))
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
