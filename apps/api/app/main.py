@@ -3,7 +3,7 @@ from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.db import get_db
-from app.rendering import create_render_job, get_render_job, RenderJobNotFound
+from app.rendering import create_render_job, get_render_job, request_render_cancellation, RenderJobNotFound
 from app.models import Project
 from app.schemas import ProjectCreate, SaveTimelineRequest, RestoreRequest, CreateRenderRequest
 from app.versioning import (
@@ -112,9 +112,27 @@ async def get_project_render(project_id: UUID, job_id: UUID, db: AsyncSession = 
             "render_profile": job.render_profile,
             "output_object_key": job.output_object_key,
             "error_message": job.error_message,
+            "attempts": job.attempts,
+            "max_attempts": job.max_attempts,
+            "progress_percent": job.progress_percent,
+            "cancel_requested": job.cancel_requested,
             "created_at": job.created_at,
             "started_at": job.started_at,
             "completed_at": job.completed_at,
+        }
+    except RenderJobNotFound:
+        raise HTTPException(404, "Render job not found")
+
+
+@app.post("/v1/projects/{project_id}/renders/{job_id}/cancel")
+async def cancel_project_render(project_id: UUID, job_id: UUID, db: AsyncSession = Depends(get_db)):
+    try:
+        async with db.begin():
+            job = await request_render_cancellation(db, project_id, job_id)
+        return {
+            "job_id": str(job.id),
+            "status": job.status,
+            "cancel_requested": job.cancel_requested,
         }
     except RenderJobNotFound:
         raise HTTPException(404, "Render job not found")
