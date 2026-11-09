@@ -265,3 +265,31 @@ async def test_render_job_timeline_pin_is_database_immutable(db_session):
             update(RenderJob).where(RenderJob.id == job.id).values(timeline_hash="tampered")
         )
     await db_session.rollback()
+
+
+@pytest.mark.asyncio
+async def test_render_workers_claim_different_jobs_without_double_claim(db_session):
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+    from app.rendering import create_render_job, claim_next_render_job
+
+    project = Project(title="Parallel render queue")
+    db_session.add(project)
+    await db_session.flush()
+    await save_timeline(
+        db_session, project.id,
+        TimelineDocument(project_id=project.id, sequence={"fps": 30}),
+        expected_version=0,
+    )
+    first, _ = await create_render_job(db_session, project.id, request_key="queue-a")
+    second, _ = await create_render_job(db_session, project.id, request_key="queue-b")
+    await db_session.commit()
+
+    factory = async_sessionmaker(db_session.bind, expire_on_commit=False)
+    async with factory() as worker_a:
+        async with worker_a.begin():
+            claimed_a = await claim_next_render_job(worker_a)
+            assert claimed_a.id == first.id
+            async with factory() as worker_b:
+                async with worker_b.begin():
+                    claimed_b = await claim_next_render_job(worker_b)
+                    assert claimed_b.id == second.id
