@@ -61,7 +61,7 @@ def build_ffmpeg_plan(
         raise RenderPlanError("fps cannot exceed 120")
     if not output_path or not output_path.strip():
         raise RenderPlanError("output_path is required")
-    preset = preset
+    preset = str(profile.get("preset", "medium"))
     if preset not in {"ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow"}:
         raise RenderPlanError("preset is not an allowed libx264 preset")
     try:
