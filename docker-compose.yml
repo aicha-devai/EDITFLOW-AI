@@ -24,6 +24,12 @@ services:
       - "8000:8000"
     volumes:
       - editflow_storage:/var/lib/editflow
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 30s
     depends_on:
       postgres:
         condition: service_healthy
@@ -41,6 +47,8 @@ services:
       - editflow_storage:/var/lib/editflow
     depends_on:
       postgres:
+        condition: service_healthy
+      api:
         condition: service_healthy
 volumes:
   editflow_postgres:
