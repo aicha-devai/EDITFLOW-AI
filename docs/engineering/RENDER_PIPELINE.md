@@ -95,7 +95,7 @@ Checks currently include:
 - **Near-black segments:** FFmpeg `blackdetect`, default minimum duration 0.5 seconds and pixel threshold 0.10.
 - **Frozen scenes:** FFmpeg `freezedetect`, default minimum duration 2 seconds and noise threshold -50 dB.
 - **Audio silence:** FFmpeg `silencedetect`, default minimum duration 1 second at -50 dB.
-- **Clipping and headroom:** `astats` peak level and clipped-sample diagnostics; peaks at/above -0.1 dBFS and any reported clipped samples produce warnings.
+- **Clipping and headroom:** `astats` peak level diagnostics; a measured peak at 0 dBFS is flagged as likely clipping, while peaks from -0.1 dBFS up to but below 0 dBFS receive a near-full-scale headroom warning. FFmpeg's `astats` output does not expose a reliable clipped-sample counter, so the report does not claim an exact clipped-sample count.
 
 Every finding includes a stable code, severity, message, and time range or measurement when available. The report has a `passed` or `warnings` status plus aggregate counts. These are advisory signals, not automatic render failures: black frames, frozen holds, and silence can be deliberate storytelling choices. The user/editor can review and correct them. A failure to run the QC subprocess itself is recorded as a render-attempt error under the normal retry policy; it is never silently treated as a clean report.
 
