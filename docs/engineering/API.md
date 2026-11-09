@@ -64,4 +64,4 @@ docker compose up --build
 
 The API listens on `http://localhost:8000`; health check: `GET /health`.
 
-The development startup creates missing tables automatically. Production deployment must use reviewed Alembic migrations and enforce workspace membership authorization before exposing project endpoints.
+The container applies Alembic migrations (`alembic upgrade head`) before starting the API. For local development, run `alembic upgrade head` from `apps/api` with `DATABASE_URL` set. The API no longer creates schema implicitly at startup. Workspace membership authorization is still required before public exposure.
