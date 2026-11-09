@@ -74,9 +74,9 @@ class S3ObjectStorage:
             client = boto3.client(
                 "s3",
                 region_name=region_name,
-                endpoint_url=endpoint_url,
-                aws_access_key_id=access_key_id,
-                aws_secret_access_key=secret_access_key,
+                endpoint_url=endpoint_url or None,
+                aws_access_key_id=access_key_id or None,
+                aws_secret_access_key=secret_access_key or None,
                 config=Config(s3={"addressing_style": "path"}),
             )
         self.client = client
