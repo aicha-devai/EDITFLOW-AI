@@ -102,6 +102,7 @@ async def render_claimed_job(
             quality_report = await analyze_render_quality(
                 str(output_path), includes_audio=plan.includes_audio,
                 timeout_seconds=min(timeout_seconds, 900),
+                intent_annotations=[item for item in snapshot.get("qc_intent", [])],
             )
             job.quality_report = quality_report
             await session.flush()
