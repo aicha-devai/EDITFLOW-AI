@@ -137,3 +137,16 @@ Example timeline fragment:
 ```
 
 Annotations are part of the immutable timeline snapshot and therefore pinned to the render job. A finding is classified as intentional only when its event type matches and its detected time range is fully contained within the annotation. The report retains the finding, but changes its severity from `warning` to `info`, adds `intentional: true` and the supplied reason, and excludes it from the warning count. Unmatched or non-overlapping events remain warnings. This is deterministic user/editor-provided intent, not an AI inference; automatic intent prediction is not enabled. Reports use `intentional_only` when all detected events are explicitly annotated.
+
+
+## AI QC Critic — proposal and approval workflow
+
+The first QC Critic implementation is a deterministic, explainable context engine (`deterministic_context_critic_v1`), not a connected LLM. It compares detected black/freeze/silence intervals with overlapping clip rationales and project editorial/story notes.
+
+- `GET /v1/projects/{project_id}/renders/{job_id}/qc-critic` returns stable proposal IDs, recommendation, confidence, matched language cues, evidence source, and explanation.
+- A proposal is `mark_intentional` only when timeline context contains a matching cue. Otherwise it is `inspect_as_potential_issue`; it cannot be approved as an intent annotation.
+- `POST /v1/projects/{project_id}/renders/{job_id}/qc-critic/approve` accepts explicit `proposal_ids` and `expected_version`. Approval creates an append-only timeline revision with `qc_intent` annotations.
+- Approval is rejected if the render did not succeed, the QC report is missing, the project head has moved beyond the rendered revision, the proposal is unknown, or the expected version is stale.
+- Proposal generation never mutates the timeline, QC report, or render job. No annotation is auto-approved or used to suppress a warning.
+
+This provides a safe baseline and a stable interface for a future model-backed critic. A future LLM provider must return structured evidence and confidence through the same proposal contract; it must not bypass explicit approval. The current confidence values are deterministic heuristic scores, not calibrated statistical probabilities.
