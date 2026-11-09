@@ -90,7 +90,7 @@ async def test_real_ffmpeg_perceptual_qc_detects_black_freeze_and_silence(tmp_pa
             "-f", "lavfi", "-i", "color=c=blue:s=160x120:r=10:d=3",
             "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=44100:duration=1",
             "-filter_complex",
-            "[0:v][1:v]concat=n=2:v=1:a=0[v];[2:a]apad=pad_dur=3[a]",
+            "[0:v][1:v]concat=n=2:v=1:a=0[v0];[v0]tpad=stop_mode=clone:stop_duration=2[v];[2:a]apad=pad_dur=3[a]",
             "-map", "[v]", "-map", "[a]", "-t", "4",
             "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac",
             str(sample),
