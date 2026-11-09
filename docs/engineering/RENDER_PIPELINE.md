@@ -48,7 +48,7 @@ PostgreSQL integration tests cover:
 - Strict dimension, timing, encoder-profile, and asset-resolution validation.
 - Argument-array execution (no shell command concatenation).
 
-The planner intentionally rejects custom transforms for now. It does not probe media, download assets, run FFmpeg, or upload outputs. A worker must resolve paths and probe audio streams before calling it.
+The planner intentionally rejects custom transforms for now. `app.render_executor.execute_ffmpeg_plan` now launches FFmpeg with an argument array (never a shell), applies a bounded timeout, captures bounded diagnostic text, and verifies that a non-empty output file exists. A worker must resolve paths and probe audio streams before calling the planner. Neither module downloads assets nor uploads outputs.
 
 ## Not yet implemented
 
