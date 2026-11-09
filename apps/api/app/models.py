@@ -25,7 +25,6 @@ class TimelineVersion(Base):
     __tablename__ = "timeline_versions"
     __table_args__ = (
         UniqueConstraint("project_id", "version", name="uq_timeline_version_number"),
-        UniqueConstraint("project_id", "content_hash", name="uq_timeline_version_hash"),
     )
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
