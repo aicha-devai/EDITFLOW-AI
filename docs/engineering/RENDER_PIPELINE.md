@@ -64,3 +64,24 @@ GitHub Actions installs FFmpeg/ffprobe and runs PostgreSQL and media integration
 - Production object storage bucket provisioning, IAM policy, signed URL API exposure, and live cloud integration test.
 - Workspace RBAC; render endpoints must not be exposed publicly before authorization is added.
 - Full frontend/editor interface.
+
+
+## Worker reliability
+
+Migration `0003_render_reliability` adds:
+- A unique lease token and expiry timestamp per active attempt.
+- Heartbeat timestamps and worker-side lease renewal in a separate database session.
+- Attempt counters with a bounded retry policy (default maximum: 3 attempts).
+- Delayed retry scheduling with exponential backoff (capped at five minutes).
+- Monotonic progress percentage and cancellation requests.
+- Recovery of expired worker leases; an expired attempt can be reclaimed by another worker, while exhausted jobs are closed as failed.
+- Fencing: heartbeat, completion, and failure operations require the current lease token. A stale worker cannot complete or fail a job after another worker has reclaimed it.
+- Attempt-specific output object keys prevent a stale attempt from overwriting a later attempt's output.
+
+The worker lease duration is configured with `RENDER_LEASE_SECONDS` (default 120 seconds; minimum 15). The worker renews the lease independently while rendering. Cancellation of a running job is cooperative: the worker acknowledges it at its next heartbeat/completion boundary; the current FFmpeg process is not yet interrupted mid-encode. Progress currently reports worker-stage heartbeat progress, not frame-accurate FFmpeg progress.
+
+API:
+- `POST /v1/projects/{project_id}/renders/{job_id}/cancel`
+- `GET /v1/projects/{project_id}/renders/{job_id}` includes attempts, max_attempts, progress_percent, and cancel_requested.
+
+Tests cover lease expiry/reclaim, stale-token fencing, retry scheduling, heartbeat renewal, monotonic progress, and queued/running cancellation. Live multi-process crash/restart testing remains a deployment-level verification item.
