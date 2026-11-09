@@ -61,6 +61,15 @@ def build_ffmpeg_plan(
         raise RenderPlanError("fps cannot exceed 120")
     if not output_path or not output_path.strip():
         raise RenderPlanError("output_path is required")
+    preset = preset
+    if preset not in {"ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow"}:
+        raise RenderPlanError("preset is not an allowed libx264 preset")
+    try:
+        crf = int(profile.get("crf", 20))
+    except (TypeError, ValueError):
+        raise RenderPlanError("crf must be an integer from 0 to 51") from None
+    if crf < 0 or crf > 51:
+        raise RenderPlanError("crf must be an integer from 0 to 51")
 
     clips = list(timeline_snapshot.get("clips") or [])
     if not clips:
@@ -142,7 +151,7 @@ def build_ffmpeg_plan(
         argv.append("-an")
     argv.extend([
         "-c:v", "libx264", "-preset", str(profile.get("preset", "medium")),
-        "-crf", str(int(profile.get("crf", 20))), "-pix_fmt", "yuv420p",
+        "-crf", str(crf), "-pix_fmt", "yuv420p",
         "-r", str(fps), "-movflags", "+faststart", "-t", str(total_duration),
         output_path,
     ])
