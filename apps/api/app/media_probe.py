@@ -1,4 +1,4 @@
-"""Bounded ffprobe metadata inspection for local media assets."""
+"""Bounded ffprobe metadata inspection for source and rendered media."""
 from __future__ import annotations
 
 import asyncio
@@ -19,6 +19,7 @@ class MediaInfo:
     height: int | None
     video_codec: str | None
     audio_codec: str | None
+    format_name: str | None = None
 
 
 async def probe_media(path: str, timeout_seconds: int = 30) -> MediaInfo:
@@ -27,7 +28,7 @@ async def probe_media(path: str, timeout_seconds: int = 30) -> MediaInfo:
     try:
         process = await asyncio.create_subprocess_exec(
             "ffprobe", "-v", "error", "-show_entries",
-            "format=duration:stream=codec_type,codec_name,width,height",
+            "format=duration,format_name:stream=codec_type,codec_name,width,height",
             "-of", "json", path,
             stdin=asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.PIPE,
@@ -41,6 +42,10 @@ async def probe_media(path: str, timeout_seconds: int = 30) -> MediaInfo:
         process.kill()
         await process.communicate()
         raise MediaProbeError("ffprobe timed out") from None
+    except asyncio.CancelledError:
+        process.kill()
+        await process.communicate()
+        raise
     if process.returncode != 0:
         detail = (stderr or b"").decode("utf-8", errors="replace")[-2000:]
         raise MediaProbeError(f"ffprobe failed: {detail}")
@@ -49,7 +54,8 @@ async def probe_media(path: str, timeout_seconds: int = 30) -> MediaInfo:
         streams = payload.get("streams", [])
         video = next((s for s in streams if s.get("codec_type") == "video"), None)
         audio = next((s for s in streams if s.get("codec_type") == "audio"), None)
-        duration = float(payload.get("format", {}).get("duration", 0))
+        fmt = payload.get("format", {})
+        duration = float(fmt.get("duration", 0))
         if duration <= 0:
             raise ValueError("missing positive duration")
     except (ValueError, TypeError, json.JSONDecodeError) as exc:
@@ -64,4 +70,5 @@ async def probe_media(path: str, timeout_seconds: int = 30) -> MediaInfo:
         height=int(video["height"]) if video.get("height") else None,
         video_codec=video.get("codec_name"),
         audio_codec=audio.get("codec_name") if audio else None,
+        format_name=fmt.get("format_name"),
     )
