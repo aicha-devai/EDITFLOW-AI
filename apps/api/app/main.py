@@ -3,6 +3,7 @@ from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.db import get_db
+from app.rendering import create_render_job, get_render_job, RenderJobNotFound
 from app.models import Project
 from app.schemas import ProjectCreate, SaveTimelineRequest, RestoreRequest, CreateRenderRequest
 from app.versioning import (
