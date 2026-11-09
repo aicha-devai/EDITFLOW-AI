@@ -56,11 +56,17 @@ async def test_worker_renders_pinned_snapshot_and_stores_output(db_session, tmp_
     async def fake_decode(_path, timeout_seconds=3600):
         return ""
     monkeypatch.setattr(worker_module, "verify_output_decode", fake_decode)
+    async def fake_qc(_path, *, includes_audio, timeout_seconds=900):
+        return {"schema_version": "1.0", "status": "warnings", "summary": {"warning_count": 1},
+                "findings": [{"code": "frozen_scene", "severity": "warning"}]}
+    monkeypatch.setattr(worker_module, "analyze_render_quality", fake_qc)
     finished = await render_claimed_job(
         db_session, job.id, storage, tmp_path / "work", timeout_seconds=10
     )
 
     assert finished.status == "succeeded"
+    assert finished.quality_report["status"] == "warnings"
+    assert finished.quality_report["findings"][0]["code"] == "frozen_scene"
     assert finished.output_object_key == f"renders/{project.id}/{job.id}/attempt-1.mp4"
     assert storage._resolve(finished.output_object_key).read_bytes() == b"rendered-video"
 
