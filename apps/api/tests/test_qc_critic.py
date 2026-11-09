@@ -59,8 +59,8 @@ def test_critic_proposal_ids_are_stable_and_range_specific():
 async def test_critic_approval_appends_new_timeline_version_and_rejects_inspect_only(db_session):
     from app.models import Project, RenderJob
     from app.schemas import TimelineDocument
-    from app.versioning import save_timeline, VersionConflict
-    from app.qc_critic import approve_qc_intent_proposals
+    from app.versioning import save_timeline
+    from app.qc_critic import approve_qc_intent_proposals, StaleQCCriticBase
 
     project = Project(title="QC critic approval")
     db_session.add(project)
@@ -100,7 +100,7 @@ async def test_critic_approval_appends_new_timeline_version_and_rejects_inspect_
     assert count == 1
     assert row.timeline_json["qc_intent"][0]["kind"] == "black_segment"
 
-    with pytest.raises(VersionConflict):
+    with pytest.raises(StaleQCCriticBase):
         await approve_qc_intent_proposals(
             db_session, project.id, job.id, [black["proposal_id"]], 1
         )
