@@ -18,7 +18,9 @@ def canonical_timeline(timeline: TimelineDocument) -> dict:
     return data
 
 def timeline_hash(data: dict) -> str:
-    raw = json.dumps(data, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    normalized = dict(data)
+    normalized["version"] = 0
+    raw = json.dumps(normalized, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 async def _retain_assets(session: AsyncSession, version_id: uuid.UUID, project_id: uuid.UUID, data: dict):
