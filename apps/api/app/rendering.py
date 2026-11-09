@@ -89,6 +89,8 @@ async def get_render_job(session: AsyncSession, project_id: uuid.UUID, job_id: u
 
 
 async def claim_next_render_job(session: AsyncSession, lease_seconds: int = 90):
+    if lease_seconds < 1 or lease_seconds > 3600:
+        raise ValueError("lease_seconds must be between 1 and 3600")
     now = datetime.now(timezone.utc)
     # Expired final attempts cannot be retried; close them before selecting work.
     exhausted = (await session.scalars(select(RenderJob).where(
@@ -149,8 +151,9 @@ async def heartbeat_render_job(
     job = await session.scalar(select(RenderJob).where(RenderJob.id == job_id).with_for_update())
     if job is None:
         raise RenderJobNotFound()
-    if job.status != "running" or job.lease_token != lease_token:
-        raise LeaseLost("Worker no longer owns this render job")
+    now = datetime.now(timezone.utc)
+    if job.status != "running" or job.lease_token != lease_token or job.lease_expires_at is None or job.lease_expires_at <= now:
+        raise LeaseLost("Worker lease is no longer valid")
     if job.cancel_requested:
         raise RenderCancelled("Render cancellation was requested")
     now = datetime.now(timezone.utc)
@@ -168,8 +171,9 @@ async def complete_render_job(session: AsyncSession, job_id: uuid.UUID, output_o
     job = await session.scalar(select(RenderJob).where(RenderJob.id == job_id).with_for_update())
     if job is None:
         raise RenderJobNotFound()
-    if job.status != "running" or job.lease_token != lease_token:
-        raise LeaseLost("Worker no longer owns this render job")
+    now = datetime.now(timezone.utc)
+    if job.status != "running" or job.lease_token != lease_token or job.lease_expires_at is None or job.lease_expires_at <= now:
+        raise LeaseLost("Worker lease is no longer valid")
     if job.cancel_requested:
         job.status = "cancelled"
         job.completed_at = datetime.now(timezone.utc)
@@ -196,9 +200,9 @@ async def fail_render_job(
     job = await session.scalar(select(RenderJob).where(RenderJob.id == job_id).with_for_update())
     if job is None:
         raise RenderJobNotFound()
-    if job.status != "running" or job.lease_token != lease_token:
-        raise LeaseLost("Worker no longer owns this render job")
     now = datetime.now(timezone.utc)
+    if job.status != "running" or job.lease_token != lease_token or job.lease_expires_at is None or job.lease_expires_at <= now:
+        raise LeaseLost("Worker lease is no longer valid")
     job.error_message = error_message[:4000]
     job.lease_token = None
     job.lease_expires_at = None
