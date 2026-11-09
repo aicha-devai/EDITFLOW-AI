@@ -87,15 +87,15 @@ async def analyze_render_quality(
         "black_segment", "Sustained near-black segment detected; confirm it is intentional.",
     )
     findings += _events(
-        output, r"freeze_start:\\s*([0-9.]+)", r"freeze_end:\\s*([0-9.]+)",
+        output, r"freeze_start:\s*([0-9.]+)", r"freeze_end:\s*([0-9.]+)",
         "frozen_scene", "Potential frozen scene detected; confirm the still frame is intentional.",
     )
     if includes_audio:
         findings += _events(
-            output, r"silence_start:\\s*([0-9.]+)", r"silence_end:\\s*([0-9.]+)",
+            output, r"silence_start:\s*([0-9.]+)", r"silence_end:\s*([0-9.]+)",
             "audio_silence", "Sustained audio silence detected; confirm narration/music is not missing.",
         )
-        peaks = re.findall(r"Peak level dB:\\s*(-?inf|-?[0-9.]+)", output, flags=re.IGNORECASE)
+        peaks = re.findall(r"Peak level dB:\s*(-?inf|-?[0-9.]+)", output, flags=re.IGNORECASE)
         finite_peaks = [float(value) for value in peaks if value.lower() != "-inf"]
         if finite_peaks:
             peak_dbfs = max(finite_peaks)
