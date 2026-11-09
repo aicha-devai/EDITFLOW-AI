@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.db import get_db
 from app.models import Project
-from app.schemas import ProjectCreate, SaveTimelineRequest, RestoreRequest
+from app.schemas import ProjectCreate, SaveTimelineRequest, RestoreRequest, CreateRenderRequest
 from app.versioning import (
     save_timeline, list_versions, compare_versions, restore_version,
     VersionConflict, ProjectNotFound,
@@ -72,3 +72,48 @@ async def restore_project_version(project_id: UUID, source_version: int, payload
         raise HTTPException(409, str(exc))
     except ValueError as exc:
         raise HTTPException(422, str(exc))
+
+
+@app.post("/v1/projects/{project_id}/renders", status_code=202)
+async def create_project_render(project_id: UUID, payload: CreateRenderRequest, db: AsyncSession = Depends(get_db)):
+    try:
+        async with db.begin():
+            job, created = await create_render_job(
+                db, project_id, payload.timeline_version,
+                payload.render_profile, payload.request_key,
+            )
+        return {
+            "created": created,
+            "job_id": str(job.id),
+            "status": job.status,
+            "timeline_version_id": str(job.timeline_version_id),
+            "timeline_hash": job.timeline_hash,
+            "created_at": job.created_at,
+        }
+    except ProjectNotFound:
+        raise HTTPException(404, "Project not found")
+    except LookupError as exc:
+        raise HTTPException(404, str(exc))
+    except VersionConflict as exc:
+        raise HTTPException(409, str(exc))
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
+
+@app.get("/v1/projects/{project_id}/renders/{job_id}")
+async def get_project_render(project_id: UUID, job_id: UUID, db: AsyncSession = Depends(get_db)):
+    try:
+        job = await get_render_job(db, project_id, job_id)
+        return {
+            "job_id": str(job.id),
+            "status": job.status,
+            "timeline_version_id": str(job.timeline_version_id),
+            "timeline_hash": job.timeline_hash,
+            "render_profile": job.render_profile,
+            "output_object_key": job.output_object_key,
+            "error_message": job.error_message,
+            "created_at": job.created_at,
+            "started_at": job.started_at,
+            "completed_at": job.completed_at,
+        }
+    except RenderJobNotFound:
+        raise HTTPException(404, "Render job not found")
