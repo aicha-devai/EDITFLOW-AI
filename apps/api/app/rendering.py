@@ -62,7 +62,7 @@ async def create_render_job(
     if version_row is None:
         raise LookupError("Timeline version does not exist")
 
-    snapshot = dict(version_row.timeline_json)
+    snapshot = copy.deepcopy(version_row.timeline_json)
     digest = timeline_hash(snapshot)
     if digest != version_row.content_hash:
         raise ValueError("Stored timeline snapshot hash does not match its immutable version")
