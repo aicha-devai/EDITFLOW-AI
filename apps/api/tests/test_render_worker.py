@@ -56,7 +56,7 @@ async def test_worker_renders_pinned_snapshot_and_stores_output(db_session, tmp_
     async def fake_decode(_path, timeout_seconds=3600):
         return ""
     monkeypatch.setattr(worker_module, "verify_output_decode", fake_decode)
-    async def fake_qc(_path, *, includes_audio, timeout_seconds=900):
+    async def fake_qc(_path, *, includes_audio, timeout_seconds=900, intent_annotations=None):
         return {"schema_version": "1.0", "status": "warnings", "summary": {"warning_count": 1},
                 "findings": [{"code": "frozen_scene", "severity": "warning"}]}
     monkeypatch.setattr(worker_module, "analyze_render_quality", fake_qc)
