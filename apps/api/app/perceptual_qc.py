@@ -144,11 +144,13 @@ async def analyze_render_quality(
             "audio_analyzed": includes_audio,
         },
         "summary": {
-            "warning_count": warning_count,\n            "intentional_findings": intentional_count,
+            "warning_count": warning_count,
+            "intentional_findings": intentional_count,
             "black_segments": sum(item["code"] == "black_segment" for item in findings),
             "frozen_scenes": sum(item["code"] == "frozen_scene" for item in findings),
             "audio_silence_events": sum(item["code"] == "audio_silence" for item in findings),
             "audio_clipping": sum(item["code"] == "audio_clipping" for item in findings),
         },
-        "findings": findings,\n        "intent_annotations_applied": intentional_count,
+        "findings": findings,
+        "intent_annotations_applied": intentional_count,
     }
