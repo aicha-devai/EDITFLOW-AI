@@ -205,7 +205,7 @@ async def test_render_job_is_pinned_to_immutable_timeline_even_after_new_version
     assert claimed.timeline_version_id == v1.id
     assert claimed.timeline_snapshot["sequence"]["fps"] == 24
 
-    finished = await complete_render_job(db_session, job.id, "renders/project-1/job-1.mp4")
+    finished = await complete_render_job(db_session, job.id, "renders/project-1/job-1.mp4", claimed.lease_token)
     assert finished.status == "succeeded"
     assert finished.output_object_key == "renders/project-1/job-1.mp4"
 
