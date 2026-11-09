@@ -132,3 +132,15 @@ async def test_critic_refuses_approval_when_project_head_moved_past_render(db_se
     )
     with pytest.raises(StaleQCCriticBase):
         await approve_qc_intent_proposals(db_session, project.id, job.id, ["not-used"], 2)
+
+
+def test_critic_skips_findings_already_classified_as_intentional():
+    result = generate_qc_critic_proposals(
+        {"findings": [{
+            "code": "black_segment", "severity": "info", "intentional": True,
+            "start_seconds": 2, "end_seconds": 3,
+        }]},
+        {"editorial_notes": ["Intentional blackout"]},
+    )
+    assert result["proposals"] == []
+    assert result["automatic_changes"] == 0
