@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from app.config import settings
 from app.rendering import claim_next_render_job
 from app.render_worker import render_claimed_job
-from app.storage import LocalObjectStorage
+from app.storage import create_object_storage
 
 
 logging.basicConfig(
@@ -24,14 +24,13 @@ logger = logging.getLogger("editflow.worker")
 async def run_worker() -> None:
     engine = create_async_engine(settings.database_url, pool_pre_ping=True)
     sessions = async_sessionmaker(engine, expire_on_commit=False)
-    storage_root = Path(os.getenv("EDITFLOW_STORAGE_ROOT", "/var/lib/editflow"))
     work_root = Path(os.getenv("EDITFLOW_WORK_ROOT", "/tmp/editflow-work"))
     poll_seconds = float(os.getenv("WORKER_POLL_SECONDS", "2"))
     timeout_seconds = int(os.getenv("RENDER_TIMEOUT_SECONDS", "3600"))
-    storage = LocalObjectStorage(storage_root)
+    storage = create_object_storage(settings)
     work_root.mkdir(parents=True, exist_ok=True)
 
-    logger.info("Render worker started; storage root=%s", storage_root)
+    logger.info("Render worker started; storage backend=%s", settings.storage_backend)
     try:
         while True:
             job_id = None
