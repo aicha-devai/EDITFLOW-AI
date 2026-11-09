@@ -144,7 +144,8 @@ async def compare_versions(session: AsyncSession, project_id: uuid.UUID, from_ve
         "from_version": from_version, "to_version": to_version,
         "added": added, "removed": removed, "changed": changed,
         "sequence_changes": sequence_changes,
-        "editorial_notes_changed": editorial_notes_changed,\n        "qc_intent_changes": qc_intent_changes,
+        "editorial_notes_changed": editorial_notes_changed,
+        "qc_intent_changes": qc_intent_changes,
     }
 
 async def restore_version(session: AsyncSession, project_id: uuid.UUID, source_version: int, expected_version: int, message: str | None = None):
