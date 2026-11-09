@@ -60,7 +60,7 @@ GitHub Actions installs FFmpeg/ffprobe and runs PostgreSQL and media integration
 
 ## Not yet implemented
 
-- Worker retries, lease expiry/heartbeat, cancellation, progress events, and distributed queue telemetry.
+- Distributed queue telemetry and frame-accurate FFmpeg progress.
 - Production object storage bucket provisioning, IAM policy, signed URL API exposure, and live cloud integration test.
 - Workspace RBAC; render endpoints must not be exposed publicly before authorization is added.
 - Full frontend/editor interface.
