@@ -100,3 +100,40 @@ Checks currently include:
 Every finding includes a stable code, severity, message, and time range or measurement when available. The report has a `passed` or `warnings` status plus aggregate counts. These are advisory signals, not automatic render failures: black frames, frozen holds, and silence can be deliberate storytelling choices. The user/editor can review and correct them. A failure to run the QC subprocess itself is recorded as a render-attempt error under the normal retry policy; it is never silently treated as a clean report.
 
 Migration `0004_render_quality_report` adds nullable JSONB storage for the report. Older render jobs naturally return `quality_report: null`. QC thresholds are currently worker defaults and are not yet configurable per project or timeline segment. Intent-aware allow-lists, loudness/true-peak standards (EBU R128), stereo phase checks, and visual artifact/blur detection remain future work.
+
+
+### Intent-aware QC annotations
+
+Timeline schema accepts an optional `qc_intent` array (maximum 100 entries). Each annotation has:
+- `kind`: `black_segment`, `frozen_scene`, or `audio_silence`.
+- `start_seconds` and `end_seconds`: a positive, non-empty interval in final timeline time.
+- `reason`: a short human-readable editorial explanation (3–300 characters).
+
+Example timeline fragment:
+
+```json
+{
+  "qc_intent": [
+    {
+      "kind": "black_segment",
+      "start_seconds": 12.4,
+      "end_seconds": 13.2,
+      "reason": "Intentional blackout before the reveal"
+    },
+    {
+      "kind": "frozen_scene",
+      "start_seconds": 28.0,
+      "end_seconds": 30.5,
+      "reason": "Deliberate evidence-board hold"
+    },
+    {
+      "kind": "audio_silence",
+      "start_seconds": 41.0,
+      "end_seconds": 43.0,
+      "reason": "Narrative pause before the final line"
+    }
+  ]
+}
+```
+
+Annotations are part of the immutable timeline snapshot and therefore pinned to the render job. A finding is classified as intentional only when its event type matches and its detected time range overlaps the annotation. The report retains the finding, but changes its severity from `warning` to `info`, adds `intentional: true` and the supplied reason, and excludes it from the warning count. Unmatched or non-overlapping events remain warnings. This is deterministic user/editor-provided intent, not an AI inference; automatic intent prediction is not enabled. Reports use `intentional_only` when all detected events are explicitly annotated.
