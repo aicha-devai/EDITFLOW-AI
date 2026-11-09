@@ -94,7 +94,7 @@ async def test_worker_fails_job_and_does_not_publish_invalid_output(db_session, 
         if str(path).endswith("render.mp4"):
             return SimpleNamespace(
                 duration_seconds=2.0, has_video=True, has_audio=False,
-                width=640, height=360, video_codec="h264",
+                width=1080, height=1920, video_codec="h264",
                 audio_codec=None, format_name="mov,mp4,m4a,3gp,3g2,mj2",
             )
         return SimpleNamespace(duration_seconds=5.0, has_audio=False)
@@ -104,12 +104,16 @@ async def test_worker_fails_job_and_does_not_publish_invalid_output(db_session, 
         Path(plan.output_path).write_bytes(b"encoded-but-wrong-size")
         return SimpleNamespace(output_path=plan.output_path, stderr_tail="")
 
+    async def reject_decode(_path, timeout_seconds=3600):
+        raise worker_module.RenderWorkerError("FFmpeg output decode verification failed: corrupt frame")
+
     monkeypatch.setattr(worker_module, "probe_media", fake_probe)
     monkeypatch.setattr(worker_module, "execute_ffmpeg_plan", fake_execute)
+    monkeypatch.setattr(worker_module, "verify_output_decode", reject_decode)
     finished = await render_claimed_job(
         db_session, job.id, storage, tmp_path / "invalid-work", timeout_seconds=10
     )
 
     assert finished.status == "queued"  # retry policy requeues a failed attempt
-    assert "width mismatch" in finished.error_message
+    assert "decode verification failed" in finished.error_message
     assert finished.output_object_key is None
