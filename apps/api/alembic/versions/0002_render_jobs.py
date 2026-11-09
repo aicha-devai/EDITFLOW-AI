@@ -36,7 +36,7 @@ def upgrade():
       IF NEW.project_id IS DISTINCT FROM OLD.project_id
          OR NEW.timeline_version_id IS DISTINCT FROM OLD.timeline_version_id
          OR NEW.timeline_snapshot IS DISTINCT FROM OLD.timeline_snapshot
-         OR NEW.timeline_hash IS DISTINCT FROM OLD.timeline_hash THEN
+         OR NEW.timeline_hash IS DISTINCT FROM OLD.timeline_hash\n         OR NEW.render_profile IS DISTINCT FROM OLD.render_profile THEN
         RAISE EXCEPTION 'render job timeline pin is immutable';
       END IF;
       RETURN NEW;
