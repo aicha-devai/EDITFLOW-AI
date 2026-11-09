@@ -19,7 +19,13 @@ services:
       context: ./apps/api
     environment:
       DATABASE_URL: postgresql+asyncpg://editflow:editflow@postgres:5432/editflow
+      EDITFLOW_STORAGE_BACKEND: ${EDITFLOW_STORAGE_BACKEND:-local}
       EDITFLOW_STORAGE_ROOT: /var/lib/editflow
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:-}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
     ports:
       - "8000:8000"
     volumes:
@@ -39,7 +45,13 @@ services:
     command: ["python", "-m", "app.worker_main"]
     environment:
       DATABASE_URL: postgresql+asyncpg://editflow:editflow@postgres:5432/editflow
+      EDITFLOW_STORAGE_BACKEND: ${EDITFLOW_STORAGE_BACKEND:-local}
       EDITFLOW_STORAGE_ROOT: /var/lib/editflow
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:-}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
       EDITFLOW_WORK_ROOT: /tmp/editflow-work
       WORKER_POLL_SECONDS: "2"
       RENDER_TIMEOUT_SECONDS: "3600"
