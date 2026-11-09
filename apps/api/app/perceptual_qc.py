@@ -34,6 +34,7 @@ async def analyze_render_quality(
     freeze_min_duration: float = 2.0,
     silence_min_duration: float = 1.0,
     silence_noise_db: float = -50.0,
+    intent_annotations: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Run black/freeze/silence/peak/clipping diagnostics. Findings are warnings only."""
     if not 1 <= timeout_seconds <= 21600:
@@ -111,9 +112,30 @@ async def analyze_render_quality(
                 "peak_dbfs": round(max(finite_peaks), 2),
             })
 
+    # Explicit timeline annotations suppress only matching event types and overlapping ranges.
+    # Keep the diagnostic visible in the report, but downgrade it to informational.
+    annotations = intent_annotations or []
+    for finding in findings:
+        start = finding.get("start_seconds")
+        end = finding.get("end_seconds")
+        if start is None:
+            continue
+        event_end = end if end is not None else start
+        for annotation in annotations:
+            if annotation.get("kind") != finding["code"]:
+                continue
+            if float(annotation["start_seconds"]) <= event_end and float(annotation["end_seconds"]) >= float(start):
+                finding["intentional"] = True
+                finding["severity"] = "info"
+                finding["classification"] = "intentional"
+                finding["intent_reason"] = annotation["reason"]
+                break
+
+    warning_count = sum(item["severity"] == "warning" for item in findings)
+    intentional_count = sum(item.get("intentional", False) for item in findings)
     return {
-        "schema_version": "1.0",
-        "status": "warnings" if findings else "passed",
+        "schema_version": "1.1",
+        "status": "warnings" if warning_count else ("intentional_only" if intentional_count else "passed"),
         "analysis": {
             "black_min_duration_seconds": black_min_duration,
             "freeze_min_duration_seconds": freeze_min_duration,
@@ -122,11 +144,11 @@ async def analyze_render_quality(
             "audio_analyzed": includes_audio,
         },
         "summary": {
-            "warning_count": len(findings),
+            "warning_count": warning_count,\n            "intentional_findings": intentional_count,
             "black_segments": sum(item["code"] == "black_segment" for item in findings),
             "frozen_scenes": sum(item["code"] == "frozen_scene" for item in findings),
             "audio_silence_events": sum(item["code"] == "audio_silence" for item in findings),
             "audio_clipping": sum(item["code"] == "audio_clipping" for item in findings),
         },
-        "findings": findings,
+        "findings": findings,\n        "intent_annotations_applied": intentional_count,
     }
