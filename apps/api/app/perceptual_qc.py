@@ -87,30 +87,30 @@ async def analyze_render_quality(
         "black_segment", "Sustained near-black segment detected; confirm it is intentional.",
     )
     findings += _events(
-        output, r"freeze_start:([0-9.]+)", r"freeze_end:([0-9.]+)",
+        output, r"freeze_start:\\s*([0-9.]+)", r"freeze_end:\\s*([0-9.]+)",
         "frozen_scene", "Potential frozen scene detected; confirm the still frame is intentional.",
     )
     if includes_audio:
         findings += _events(
-            output, r"silence_start:([0-9.]+)", r"silence_end:([0-9.]+)",
+            output, r"silence_start:\\s*([0-9.]+)", r"silence_end:\\s*([0-9.]+)",
             "audio_silence", "Sustained audio silence detected; confirm narration/music is not missing.",
         )
-        clipped = re.findall(r"Number of clipped samples:\s*(\d+)", output, flags=re.IGNORECASE)
-        clipped_count = max((int(value) for value in clipped), default=0)
-        if clipped_count:
-            findings.append({
-                "code": "audio_clipping", "severity": "warning",
-                "message": "Audio clipping samples detected; reduce gain or limiter threshold.",
-                "sample_count": clipped_count,
-            })
-        peaks = re.findall(r"Peak level dB:\s*(-?inf|-?[0-9.]+)", output, flags=re.IGNORECASE)
+        peaks = re.findall(r"Peak level dB:\\s*(-?inf|-?[0-9.]+)", output, flags=re.IGNORECASE)
         finite_peaks = [float(value) for value in peaks if value.lower() != "-inf"]
-        if finite_peaks and max(finite_peaks) >= -0.1:
-            findings.append({
-                "code": "audio_peak_near_full_scale", "severity": "warning",
-                "message": "Audio peak is at or near 0 dBFS; check headroom and possible distortion.",
-                "peak_dbfs": round(max(finite_peaks), 2),
-            })
+        if finite_peaks:
+            peak_dbfs = max(finite_peaks)
+            if peak_dbfs >= -0.001:
+                findings.append({
+                    "code": "audio_clipping", "severity": "warning",
+                    "message": "Audio reaches digital full scale (0 dBFS); clipping is likely. Reduce gain and add headroom.",
+                    "peak_dbfs": round(peak_dbfs, 3),
+                })
+            elif peak_dbfs >= -0.1:
+                findings.append({
+                    "code": "audio_peak_near_full_scale", "severity": "warning",
+                    "message": "Audio peak is very close to 0 dBFS; check headroom and possible distortion.",
+                    "peak_dbfs": round(peak_dbfs, 2),
+                })
 
     # Explicit timeline annotations suppress only matching event types fully covered by the declared range.
     # Keep the diagnostic visible in the report, but downgrade it to informational.
