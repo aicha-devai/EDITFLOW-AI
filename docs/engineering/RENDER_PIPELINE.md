@@ -28,32 +28,39 @@ The worker receives the pinned snapshot. It must not read `projects.current_vers
 
 Creation supports a project-scoped `request_key` for safe retries.
 
-## Verification
+## Worker and media pipeline
 
-PostgreSQL integration tests cover:
-1. Create a job pinned to version 1.
-2. Save version 2 with different sequence settings and notes.
-3. Assert the job still references version 1 and its snapshot/hash are unchanged.
-4. Claim the job and assert worker input still contains version 1.
-5. Complete the job and verify output metadata.
-6. Attempt to mutate the pinned hash and assert the database trigger rejects it.
-7. Concurrent queue consumers use row locking with `SKIP LOCKED`.
+The dedicated `app.worker_main` process polls and claims jobs in a short transaction, then renders outside the claim transaction. It reads only the pinned snapshot, resolves project-owned assets, probes source media with `ffprobe`, validates source ranges, plans an FFmpeg command, executes it without a shell, and stores the resulting MP4.
 
-## FFmpeg planner foundation
-
-`app.render_engine.build_ffmpeg_plan` now creates a deterministic FFmpeg argv from the pinned snapshot and a caller-supplied asset-ID-to-local-path map. It supports:
+The FFmpeg planner currently supports:
 - Multiple video clips composited over a black sequence canvas at their timeline positions.
 - Source in/out trimming, frame-rate normalization, scale-to-fit with letterboxing, and H.264 output.
 - Optional audio mixing when a worker's media probe confirms which inputs contain audio.
 - Strict dimension, timing, encoder-profile, and asset-resolution validation.
-- Argument-array execution (no shell command concatenation).
 
-The planner intentionally rejects custom transforms for now. `app.render_executor.execute_ffmpeg_plan` now launches FFmpeg with an argument array (never a shell), applies a bounded timeout, captures bounded diagnostic text, and verifies that a non-empty output file exists. `app.media_probe.probe_media` now uses `ffprobe` to inspect duration, video/audio streams, codecs, and dimensions. `app.storage.LocalObjectStorage` provides a traversal-safe local filesystem adapter for development. `app.render_worker.render_claimed_job` resolves project-owned asset IDs from the pinned snapshot, materializes local media, probes it, validates source ranges, builds the plan, executes FFmpeg, stores the output, and records job completion/failure. The dedicated `app.worker_main` process polls and claims jobs in a short transaction, then renders outside the claim transaction. The Docker image installs FFmpeg/ffprobe and Compose starts a separate `render-worker` service after the API health check.
+Custom transforms, transitions, subtitles, still-image clips, and multiple independent audio tracks are not yet supported.
+
+## Storage adapters
+
+- `LocalObjectStorage`: traversal-safe local filesystem adapter for development and Docker Compose.
+- `S3ObjectStorage`: S3-compatible adapter for AWS S3, MinIO, and compatible endpoints. It supports worker-side downloads, output uploads, and expiring presigned GET URLs. Credentials are loaded from environment/runtime configuration; do not commit secrets.
+- Select with `EDITFLOW_STORAGE_BACKEND=local|s3`. For S3 configure `S3_BUCKET`, `S3_REGION`, optional `S3_ENDPOINT_URL`, and credentials (or use the runtime's IAM role).
+
+The S3 adapter has unit tests with a deterministic fake client. Live bucket connectivity, IAM policy, lifecycle/retention, and production credentials have not been validated in this repository's CI.
+
+## Verification
+
+GitHub Actions installs FFmpeg/ffprobe and runs PostgreSQL and media integration tests. Current suite includes:
+1. Immutable timeline pinning and restore/version concurrency tests.
+2. Render job idempotency, worker queue claiming, and DB-level snapshot immutability.
+3. Worker orchestration against a mocked executor.
+4. A real FFmpeg integration test that generates synthetic video+audio, runs the actual planner/executor, probes the MP4, and asserts H.264, audio, duration, and dimensions.
+5. Local storage traversal and round-trip tests.
+6. S3 adapter contract tests using a fake client.
 
 ## Not yet implemented
 
-- FFmpeg process executor, timeout/resource limits, cancellation, and process telemetry.
-- Media probing (ffprobe) and object-storage download/upload adapter with signed URLs.
-- Object-storage upload/download adapter and signed URLs.
-- Progress events, retries/lease expiry, and distributed queue telemetry.
+- Worker retries, lease expiry/heartbeat, cancellation, progress events, and distributed queue telemetry.
+- Production object storage bucket provisioning, IAM policy, signed URL API exposure, and live cloud integration test.
 - Workspace RBAC; render endpoints must not be exposed publicly before authorization is added.
+- Full frontend/editor interface.
