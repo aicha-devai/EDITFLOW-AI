@@ -15,7 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import RenderJob, TimelineVersion
-from app.schemas import TimelineDocument
+from app.schemas import QCIntentRange, TimelineDocument
 from app.versioning import VersionConflict, save_timeline
 
 
@@ -86,6 +86,8 @@ def generate_qc_critic_proposals(
 
     proposals = []
     for finding in quality_report.get("findings", []):
+        if finding.get("severity", "warning") != "warning" or finding.get("intentional"):
+            continue
         code = finding.get("code")
         kind = _KIND_BY_FINDING.get(code)
         start, end = finding.get("start_seconds"), finding.get("end_seconds")
@@ -207,7 +209,7 @@ async def approve_qc_intent_proposals(
     merged = existing + [item for item in additions if item not in existing]
     if len(merged) > 100:
         raise ValueError("Approving these proposals would exceed the 100 QC annotation limit")
-    timeline.qc_intent = merged
+    timeline.qc_intent = [QCIntentRange.model_validate(item) for item in merged]
 
     row, created = await save_timeline(
         session, project_id, timeline, expected_version,
