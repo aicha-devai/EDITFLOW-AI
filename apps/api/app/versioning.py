@@ -122,7 +122,20 @@ async def compare_versions(session: AsyncSession, project_id: uuid.UUID, from_ve
         fields = sorted(k for k in set(before[key]) | set(after[key]) if before[key].get(k) != after[key].get(k))
         if fields:
             changed.append({"clip_id": key, "fields": fields, "before": before[key], "after": after[key]})
-    return {"from_version": from_version, "to_version": to_version, "added": added, "removed": removed, "changed": changed}
+    before_doc = by_number[from_version].timeline_json
+    after_doc = by_number[to_version].timeline_json
+    sequence_changes = {
+        key: {"before": before_doc.get("sequence", {}).get(key), "after": after_doc.get("sequence", {}).get(key)}
+        for key in sorted(set(before_doc.get("sequence", {})) | set(after_doc.get("sequence", {})))
+        if before_doc.get("sequence", {}).get(key) != after_doc.get("sequence", {}).get(key)
+    }
+    editorial_notes_changed = before_doc.get("editorial_notes", []) != after_doc.get("editorial_notes", [])
+    return {
+        "from_version": from_version, "to_version": to_version,
+        "added": added, "removed": removed, "changed": changed,
+        "sequence_changes": sequence_changes,
+        "editorial_notes_changed": editorial_notes_changed,
+    }
 
 async def restore_version(session: AsyncSession, project_id: uuid.UUID, source_version: int, expected_version: int, message: str | None = None):
     source = await session.scalar(select(TimelineVersion).where(
