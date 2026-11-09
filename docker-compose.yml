@@ -55,6 +55,7 @@ services:
       EDITFLOW_WORK_ROOT: /tmp/editflow-work
       WORKER_POLL_SECONDS: "2"
       RENDER_TIMEOUT_SECONDS: "3600"
+      RENDER_LEASE_SECONDS: "120"
     volumes:
       - editflow_storage:/var/lib/editflow
     depends_on:
