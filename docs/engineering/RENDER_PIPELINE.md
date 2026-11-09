@@ -78,7 +78,7 @@ Migration `0003_render_reliability` adds:
 - Fencing: heartbeat, completion, and failure operations require the current lease token. A stale worker cannot complete or fail a job after another worker has reclaimed it.
 - Attempt-specific output object keys prevent a stale attempt from overwriting a later attempt's output.
 
-The worker lease duration is configured with `RENDER_LEASE_SECONDS` (default 120 seconds; minimum 15). The worker renews the lease independently while rendering. Cancellation of a running job is cooperative: the worker acknowledges it at its next heartbeat/completion boundary; the current FFmpeg process is not yet interrupted mid-encode. Progress currently reports worker-stage heartbeat progress, not frame-accurate FFmpeg progress.
+The worker lease duration is configured with `RENDER_LEASE_SECONDS` (default 120 seconds; minimum 15). The worker renews the lease independently while rendering. Cancellation of a running job is cooperative: the worker acknowledges it at its next heartbeat/completion boundary; the current FFmpeg process is not yet interrupted mid-encode. Progress is reported at pipeline stages (asset preparation, probing, encode completion, and output upload), not as frame-accurate FFmpeg progress.
 
 API:
 - `POST /v1/projects/{project_id}/renders/{job_id}/cancel`
