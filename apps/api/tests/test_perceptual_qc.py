@@ -78,3 +78,61 @@ async def test_quality_analysis_skips_audio_filters_when_timeline_has_no_audio(m
     assert "silencedetect" not in command and "astats" not in command
     assert report["analysis"]["audio_analyzed"] is False
     assert report["status"] == "passed"
+
+
+@pytest.mark.asyncio
+async def test_intent_annotations_downgrade_only_matching_overlapping_findings(monkeypatch):
+    import app.perceptual_qc as qc
+
+    class FakeProcess:
+        returncode = 0
+        async def communicate(self):
+            return b"", (
+                "black_start:1.000 black_end:2.000 black_duration:1.000\\n"
+                "freeze_start:4.000 freeze_end:7.000 freeze_duration:3.000\\n"
+                "silence_start:8.000 silence_end:9.500 silence_duration:1.500\\n"
+            ).encode()
+
+    async def fake_exec(*argv, **kwargs):
+        return FakeProcess()
+
+    monkeypatch.setattr(qc.asyncio, "create_subprocess_exec", fake_exec)
+    report = await qc.analyze_render_quality(
+        "story.mp4",
+        includes_audio=True,
+        intent_annotations=[
+            {"kind": "black_segment", "start_seconds": 0.8, "end_seconds": 2.2,
+             "reason": "Intentional dramatic blackout"},
+            {"kind": "audio_silence", "start_seconds": 20, "end_seconds": 22,
+             "reason": "Silence belongs to a later scene"},
+        ],
+    )
+
+    black = next(item for item in report["findings"] if item["code"] == "black_segment")
+    freeze = next(item for item in report["findings"] if item["code"] == "frozen_scene")
+    silence = next(item for item in report["findings"] if item["code"] == "audio_silence")
+    assert black["severity"] == "info"
+    assert black["intentional"] is True
+    assert black["intent_reason"] == "Intentional dramatic blackout"
+    assert freeze["severity"] == "warning"
+    assert "intentional" not in freeze
+    assert silence["severity"] == "warning"
+    assert report["status"] == "warnings"
+    assert report["summary"]["warning_count"] == 2
+    assert report["summary"]["intentional_findings"] == 1
+
+
+def test_timeline_qc_intent_requires_valid_non_empty_time_range():
+    from pydantic import ValidationError
+    from app.schemas import QCIntentRange
+
+    valid = QCIntentRange(
+        kind="frozen_scene", start_seconds=2, end_seconds=5,
+        reason="Intentional dramatic hold",
+    )
+    assert valid.end_seconds > valid.start_seconds
+    with pytest.raises(ValidationError):
+        QCIntentRange(
+            kind="frozen_scene", start_seconds=5, end_seconds=2,
+            reason="Invalid interval",
+        )
