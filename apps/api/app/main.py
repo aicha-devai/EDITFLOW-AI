@@ -2,7 +2,8 @@ from uuid import UUID
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
-from app.db import get_db
+from app.db import get_db, engine
+from app.models import Base
 from app.models import Project
 from app.schemas import ProjectCreate, SaveTimelineRequest, RestoreRequest
 from app.versioning import (
@@ -11,6 +12,12 @@ from app.versioning import (
 )
 
 app = FastAPI(title=settings.api_title, version="0.1.0")
+
+@app.on_event("startup")
+async def initialize_development_schema():
+    # Convenience for local development. Production deployments should use Alembic migrations.
+    async with engine.begin() as connection:
+        await connection.run_sync(Base.metadata.create_all)
 
 @app.get("/health")
 async def health():
@@ -31,6 +38,7 @@ async def save_project_timeline(project_id: UUID, payload: SaveTimelineRequest, 
             row, created = await save_timeline(
                 db, project_id, payload.timeline, payload.expected_version,
                 payload.message,
+                idempotency_key=payload.idempotency_key,
             )
         return {"created": created, "version": row.version, "version_id": str(row.id), "content_hash": row.content_hash}
     except ProjectNotFound:
