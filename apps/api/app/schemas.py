@@ -37,3 +37,9 @@ class SaveTimelineRequest(BaseModel):
 class RestoreRequest(BaseModel):
     expected_version: int = Field(ge=0)
     message: str | None = None
+
+
+class CreateRenderRequest(BaseModel):
+    timeline_version: int | None = Field(default=None, ge=1)
+    render_profile: dict[str, Any] = Field(default_factory=dict)
+    request_key: str | None = Field(default=None, max_length=128)
