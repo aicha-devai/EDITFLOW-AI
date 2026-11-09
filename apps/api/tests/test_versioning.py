@@ -242,3 +242,26 @@ async def test_worker_skips_locked_render_jobs(db_session):
     job = await claim_next_render_job(db_session)
     assert job is not None
     assert job.status == "running"
+
+
+@pytest.mark.asyncio
+async def test_render_job_timeline_pin_is_database_immutable(db_session):
+    from sqlalchemy import update
+    from sqlalchemy.exc import DBAPIError
+    from app.rendering import create_render_job
+    from app.models import RenderJob
+
+    project = Project(title="Immutable render pin")
+    db_session.add(project)
+    await db_session.flush()
+    await save_timeline(
+        db_session, project.id,
+        TimelineDocument(project_id=project.id, sequence={"fps": 25}),
+        expected_version=0,
+    )
+    job, _ = await create_render_job(db_session, project.id)
+    with pytest.raises(DBAPIError):
+        await db_session.execute(
+            update(RenderJob).where(RenderJob.id == job.id).values(timeline_hash="tampered")
+        )
+    await db_session.rollback()
