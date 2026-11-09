@@ -170,3 +170,75 @@ async def test_two_concurrent_writers_serialize_on_project_lock(db_session):
             .where(TimelineVersion.project_id == project_id)
         )
         assert count == 2
+
+
+@pytest.mark.asyncio
+async def test_render_job_is_pinned_to_immutable_timeline_even_after_new_version(db_session):
+    from app.rendering import create_render_job, claim_next_render_job, complete_render_job
+    from app.models import RenderJob
+
+    project = Project(title="Pinned render")
+    db_session.add(project)
+    await db_session.flush()
+    v1_doc = TimelineDocument(project_id=project.id, sequence={"fps": 24}, editorial_notes=["original"])
+    v1, _ = await save_timeline(db_session, project.id, v1_doc, expected_version=0)
+    job, created = await create_render_job(
+        db_session, project.id, timeline_version=1,
+        render_profile={"resolution": "1080x1920"}, request_key="render-request-1",
+    )
+    assert created is True
+    pinned_version_id = job.timeline_version_id
+    pinned_hash = job.timeline_hash
+    pinned_snapshot = dict(job.timeline_snapshot)
+
+    v2_doc = TimelineDocument(project_id=project.id, sequence={"fps": 60}, editorial_notes=["later edit"])
+    v2, _ = await save_timeline(db_session, project.id, v2_doc, expected_version=1)
+    assert v2.id != pinned_version_id
+    assert job.timeline_version_id == v1.id
+    assert job.timeline_hash == pinned_hash
+    assert job.timeline_snapshot == pinned_snapshot
+    assert job.timeline_snapshot["sequence"]["fps"] == 24
+
+    claimed = await claim_next_render_job(db_session)
+    assert claimed.id == job.id
+    assert claimed.status == "running"
+    assert claimed.timeline_version_id == v1.id
+    assert claimed.timeline_snapshot["sequence"]["fps"] == 24
+
+    finished = await complete_render_job(db_session, job.id, "renders/project-1/job-1.mp4")
+    assert finished.status == "succeeded"
+    assert finished.output_object_key == "renders/project-1/job-1.mp4"
+
+
+@pytest.mark.asyncio
+async def test_render_job_request_key_is_idempotent(db_session):
+    from app.rendering import create_render_job
+
+    project = Project(title="Render idempotency")
+    db_session.add(project)
+    await db_session.flush()
+    doc = TimelineDocument(project_id=project.id, sequence={"fps": 30})
+    await save_timeline(db_session, project.id, doc, expected_version=0)
+    first, created = await create_render_job(db_session, project.id, request_key="same-render")
+    replay, replay_created = await create_render_job(db_session, project.id, request_key="same-render")
+    assert created is True
+    assert replay_created is False
+    assert first.id == replay.id
+
+
+@pytest.mark.asyncio
+async def test_worker_skips_locked_render_jobs(db_session):
+    from app.rendering import create_render_job, claim_next_render_job
+
+    project = Project(title="Worker queue")
+    db_session.add(project)
+    await db_session.flush()
+    await save_timeline(
+        db_session, project.id,
+        TimelineDocument(project_id=project.id, sequence={"fps": 30}),
+        expected_version=0,
+    )
+    await create_render_job(db_session, project.id)
+    job = await claim_next_render_job(db_session)
+    assert job is not None
+    assert job.status == "running"
