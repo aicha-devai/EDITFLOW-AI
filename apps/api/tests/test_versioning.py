@@ -294,3 +294,87 @@ async def test_render_workers_claim_different_jobs_without_double_claim(db_sessi
                     claimed_b = await claim_next_render_job(worker_b)
                     assert claimed_b.id in {first.id, second.id}
                     assert claimed_b.id != claimed_a.id
+
+
+@pytest.mark.asyncio
+async def test_expired_lease_is_reclaimed_and_stale_worker_is_fenced(db_session):
+    from datetime import datetime, timezone, timedelta
+    from app.rendering import create_render_job, claim_next_render_job, heartbeat_render_job, LeaseLost
+    project = Project(title="Lease reclaim")
+    db_session.add(project)
+    await db_session.flush()
+    await save_timeline(db_session, project.id, TimelineDocument(project_id=project.id), 0)
+    job, _ = await create_render_job(db_session, project.id)
+    first = await claim_next_render_job(db_session, lease_seconds=30)
+    old_token = first.lease_token
+    first.lease_expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+    await db_session.flush()
+    second = await claim_next_render_job(db_session, lease_seconds=30)
+    assert second.id == job.id
+    assert second.attempts == 2
+    assert second.lease_token != old_token
+    with pytest.raises(LeaseLost):
+        await heartbeat_render_job(db_session, job.id, old_token)
+
+
+@pytest.mark.asyncio
+async def test_failed_attempt_is_requeued_with_backoff_then_can_succeed(db_session):
+    from app.rendering import create_render_job, claim_next_render_job, fail_render_job
+    project = Project(title="Retry lifecycle")
+    db_session.add(project)
+    await db_session.flush()
+    await save_timeline(db_session, project.id, TimelineDocument(project_id=project.id), 0)
+    job, _ = await create_render_job(db_session, project.id)
+    first = await claim_next_render_job(db_session)
+    failed = await fail_render_job(db_session, job.id, "temporary encoder error", first.lease_token, retry_delay_seconds=0)
+    assert failed.status == "queued"
+    assert failed.attempts == 1
+    second = await claim_next_render_job(db_session)
+    assert second.status == "running"
+    assert second.attempts == 2
+
+
+@pytest.mark.asyncio
+async def test_heartbeat_renews_lease_and_tracks_monotonic_progress(db_session):
+    from app.rendering import create_render_job, claim_next_render_job, heartbeat_render_job
+    project = Project(title="Heartbeat")
+    db_session.add(project)
+    await db_session.flush()
+    await save_timeline(db_session, project.id, TimelineDocument(project_id=project.id), 0)
+    job, _ = await create_render_job(db_session, project.id)
+    claimed = await claim_next_render_job(db_session, lease_seconds=30)
+    previous_expiry = claimed.lease_expires_at
+    updated = await heartbeat_render_job(db_session, job.id, claimed.lease_token, 60, 35)
+    assert updated.lease_expires_at > previous_expiry
+    assert updated.progress_percent == 35
+    updated = await heartbeat_render_job(db_session, job.id, claimed.lease_token, 60, 20)
+    assert updated.progress_percent == 35
+
+
+@pytest.mark.asyncio
+async def test_running_job_cancellation_is_acknowledged_by_heartbeat_and_completion(db_session):
+    from app.rendering import create_render_job, claim_next_render_job, heartbeat_render_job, complete_render_job, request_render_cancellation, RenderCancelled
+    project = Project(title="Cancellation")
+    db_session.add(project)
+    await db_session.flush()
+    await save_timeline(db_session, project.id, TimelineDocument(project_id=project.id), 0)
+    job, _ = await create_render_job(db_session, project.id)
+    claimed = await claim_next_render_job(db_session)
+    await request_render_cancellation(db_session, project.id, job.id)
+    with pytest.raises(RenderCancelled):
+        await heartbeat_render_job(db_session, job.id, claimed.lease_token)
+    result = await complete_render_job(db_session, job.id, "renders/cancelled.mp4", claimed.lease_token)
+    assert result.status == "cancelled"
+    assert result.output_object_key is None
+
+
+@pytest.mark.asyncio
+async def test_queued_job_can_be_cancelled_without_worker_claim(db_session):
+    from app.rendering import create_render_job, request_render_cancellation
+    project = Project(title="Queued cancellation")
+    db_session.add(project)
+    await db_session.flush()
+    await save_timeline(db_session, project.id, TimelineDocument(project_id=project.id), 0)
+    job, _ = await create_render_job(db_session, project.id)
+    result = await request_render_cancellation(db_session, project.id, job.id)
+    assert result.status == "cancelled"
