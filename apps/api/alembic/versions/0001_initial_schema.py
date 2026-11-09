@@ -43,7 +43,7 @@ def upgrade():
         sa.UniqueConstraint("project_id", "version", name="uq_timeline_version_number"),
         sa.UniqueConstraint("project_id", "idempotency_key", name="uq_timeline_version_idempotency"),
     )
-    op.create_index("ix_timeline_versions_project_version", "timeline_versions", ["project_id", sa.text("version DESC")])
+    op.execute("CREATE INDEX ix_timeline_versions_project_version ON timeline_versions (project_id, version DESC)")
     op.create_index("ix_timeline_versions_content_hash", "timeline_versions", ["project_id", "content_hash"])
     op.create_table(
         "timeline_asset_references",
