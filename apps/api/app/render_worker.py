@@ -18,12 +18,23 @@ from app.media_probe import MediaProbeError, probe_media
 from app.models import Asset, RenderJob
 from app.render_engine import build_ffmpeg_plan
 from app.render_executor import execute_ffmpeg_plan
-from app.rendering import complete_render_job, fail_render_job, LeaseLost, RenderCancelled
+from app.rendering import complete_render_job, fail_render_job, heartbeat_render_job, LeaseLost, RenderCancelled
 from app.storage import LocalObjectStorage
 
 
 class RenderWorkerError(RuntimeError):
     pass
+
+
+async def _report_progress(session_factory, job_id: UUID, lease_token: UUID, progress: int) -> None:
+    if session_factory is None:
+        return
+    async with session_factory() as progress_session:
+        async with progress_session.begin():
+            await heartbeat_render_job(
+                progress_session, job_id, lease_token,
+                lease_seconds=120, progress_percent=progress,
+            )
 
 
 async def render_claimed_job(
@@ -33,6 +44,7 @@ async def render_claimed_job(
     work_root: str | Path,
     timeout_seconds: int = 3600,
     lease_token: UUID | None = None,
+    session_factory=None,
 ) -> RenderJob:
     """Resolve pinned assets, probe, render and store one already-claimed job."""
     job = await session.scalar(select(RenderJob).where(RenderJob.id == job_id))
@@ -68,6 +80,7 @@ async def render_claimed_job(
         await fail_render_job(session, job_id, "Timeline references missing or foreign-project assets", lease_token)
         return job
 
+    await _report_progress(session_factory, job_id, lease_token, 10)
     root = Path(work_root).resolve()
     root.mkdir(parents=True, exist_ok=True)
     try:
@@ -87,6 +100,7 @@ async def render_claimed_job(
                 asset_paths[str(asset_id)] = str(local_path)
                 media_audio[str(asset_id)] = info.has_audio
                 media_duration[str(asset_id)] = info.duration_seconds
+                await _report_progress(session_factory, job_id, lease_token, 15 + int(35 * len(asset_paths) / max(1, len(asset_ids))))
 
             for index, clip in enumerate(clips):
                 asset_id = str(UUID(str(clip["asset_id"])))
@@ -97,6 +111,7 @@ async def render_claimed_job(
                 if source_out > media_duration[asset_id] + 0.05:
                     raise RenderWorkerError(f"Clip {index} source_out exceeds media duration")
 
+            await _report_progress(session_factory, job_id, lease_token, 60)
             output_path = temp / "render.mp4"
             plan = build_ffmpeg_plan(
                 snapshot,
@@ -106,8 +121,10 @@ async def render_claimed_job(
                 asset_has_audio=media_audio,
             )
             await execute_ffmpeg_plan(plan, timeout_seconds=timeout_seconds)
+            await _report_progress(session_factory, job_id, lease_token, 90)
             object_key = f"renders/{job.project_id}/{job.id}/attempt-{job.attempts}.mp4"
             await asyncio.to_thread(storage.put_file, output_path, object_key)
+            await _report_progress(session_factory, job_id, lease_token, 95)
             return await complete_render_job(session, job_id, object_key, lease_token)
     except (LeaseLost, RenderCancelled):
         raise
