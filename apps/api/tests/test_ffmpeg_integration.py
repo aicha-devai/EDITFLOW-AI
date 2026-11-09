@@ -7,7 +7,7 @@ import pytest
 
 from app.media_probe import probe_media
 from app.render_engine import build_ffmpeg_plan
-from app.render_executor import execute_ffmpeg_plan
+from app.render_executor import execute_ffmpeg_plan, verify_output_decode, RenderExecutionError
 
 
 @pytest.mark.asyncio
@@ -62,3 +62,15 @@ async def test_real_ffmpeg_render_produces_valid_mp4(tmp_path):
     assert (info.width, info.height) == (360, 640)
     assert 1.35 <= info.duration_seconds <= 1.7
     assert info.video_codec == "h264"
+    # Full decode scan must consume every encoded video/audio packet without errors.
+    await verify_output_decode(str(output), timeout_seconds=60)
+
+
+@pytest.mark.asyncio
+async def test_real_ffmpeg_decode_scan_rejects_corrupt_input(tmp_path):
+    if not shutil.which("ffmpeg"):
+        pytest.skip("FFmpeg decode integration test requires ffmpeg")
+    corrupt = tmp_path / "corrupt.mp4"
+    corrupt.write_bytes(b"this is not a decodable media file")
+    with pytest.raises(RenderExecutionError, match="decode verification failed"):
+        await verify_output_decode(str(corrupt), timeout_seconds=10)
