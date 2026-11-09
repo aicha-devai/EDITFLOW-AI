@@ -86,3 +86,17 @@ API:
 
 Tests cover lease expiry/reclaim, stale-token fencing, retry scheduling, heartbeat renewal, monotonic progress, and queued/running cancellation. Live multi-process crash/restart testing remains a deployment-level verification item.
 \n\n## Output Integrity Control\n\nA render is not publishable merely because FFmpeg exits with code zero. Before uploading the result or transitioning a job to `succeeded`, the worker runs `ffprobe` against the encoded file and validates:\n- The file exists, is readable, and is non-empty.\n- The container identifies as MP4.\n- A video stream exists and uses H.264.\n- Width and height exactly match the immutable render plan.\n- Audio presence matches the plan; when audio is expected it must be AAC.\n- Duration is within `max(0.35s, 2/fps)` of the planned duration.\n\nAny mismatch fails closed: the output is not uploaded, no output object key is published, and the render attempt follows the existing retry policy. `ffprobe` parse/decode errors are treated as integrity failures. After metadata validation, the worker runs a separate full decode-only FFmpeg pass (`-v error -xerror -err_detect explode`) over every video and audio stream, mapping them to the null muxer. This reads the complete output without re-encoding; decoder errors, corrupt packets/frames, non-zero exit, timeout, or cancellation prevent publication. The scan is bounded by the render timeout and runs before upload. It is a technical decode-integrity check, not a perceptual quality assessment (e.g. black-frame, freeze, visual artifact, or audio clipping detection).\n
+
+## Perceptual Quality Control
+
+After strict full-stream decode verification and before output upload, the worker runs a second FFmpeg analysis pass. Its structured JSON report is stored on `render_jobs.quality_report` and returned by the render-status endpoint.
+
+Checks currently include:
+- **Near-black segments:** FFmpeg `blackdetect`, default minimum duration 0.5 seconds and pixel threshold 0.10.
+- **Frozen scenes:** FFmpeg `freezedetect`, default minimum duration 2 seconds and noise threshold -50 dB.
+- **Audio silence:** FFmpeg `silencedetect`, default minimum duration 1 second at -50 dB.
+- **Clipping and headroom:** `astats` peak level and clipped-sample diagnostics; peaks at/above -0.1 dBFS and any reported clipped samples produce warnings.
+
+Every finding includes a stable code, severity, message, and time range or measurement when available. The report has a `passed` or `warnings` status plus aggregate counts. These are advisory signals, not automatic render failures: black frames, frozen holds, and silence can be deliberate storytelling choices. The user/editor can review and correct them. A failure to run the QC subprocess itself is recorded as a render-attempt error under the normal retry policy; it is never silently treated as a clean report.
+
+Migration `0004_render_quality_report` adds nullable JSONB storage for the report. Older render jobs naturally return `quality_report: null`. QC thresholds are currently worker defaults and are not yet configurable per project or timeline segment. Intent-aware allow-lists, loudness/true-peak standards (EBU R128), stereo phase checks, and visual artifact/blur detection remain future work.
