@@ -28,13 +28,18 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install -r apps/api/requirements.txt
+      - name: Install FFmpeg for real render integration tests
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes ffmpeg
+      - name: Install API dependencies
+        run: pip install -r apps/api/requirements.txt
       - name: Apply database migrations
         working-directory: apps/api
         env:
           DATABASE_URL: postgresql+asyncpg://editflow:editflow@localhost:5432/editflow_test
         run: alembic upgrade head
-      - name: Run PostgreSQL integration tests
+      - name: Run PostgreSQL and media integration tests
         working-directory: apps/api
         env:
           DATABASE_URL: postgresql+asyncpg://editflow:editflow@localhost:5432/editflow_test
