@@ -31,17 +31,18 @@ def upgrade():
         sa.CheckConstraint("status IN ('queued','running','succeeded','failed','cancelled')", name="ck_render_jobs_status"),
     )
     op.execute("""
-    CREATE FUNCTION prevent_render_snapshot_mutation() RETURNS trigger AS $
+    CREATE FUNCTION prevent_render_snapshot_mutation() RETURNS trigger AS $$
     BEGIN
       IF NEW.project_id IS DISTINCT FROM OLD.project_id
          OR NEW.timeline_version_id IS DISTINCT FROM OLD.timeline_version_id
          OR NEW.timeline_snapshot IS DISTINCT FROM OLD.timeline_snapshot
-         OR NEW.timeline_hash IS DISTINCT FROM OLD.timeline_hash\n         OR NEW.render_profile IS DISTINCT FROM OLD.render_profile THEN
+         OR NEW.timeline_hash IS DISTINCT FROM OLD.timeline_hash
+         OR NEW.render_profile IS DISTINCT FROM OLD.render_profile THEN
         RAISE EXCEPTION 'render job timeline pin is immutable';
       END IF;
       RETURN NEW;
     END;
-    $ LANGUAGE plpgsql
+    $$ LANGUAGE plpgsql
     """)
     op.execute("""
     CREATE TRIGGER trg_render_job_snapshot_immutable
@@ -52,6 +53,8 @@ def upgrade():
     op.create_index("ix_render_jobs_project_created", "render_jobs", ["project_id", "created_at"])
 
 def downgrade():
-    op.execute("DROP TRIGGER IF EXISTS trg_render_job_snapshot_immutable ON render_jobs")\n    op.execute("DROP FUNCTION IF EXISTS prevent_render_snapshot_mutation()")\n    op.drop_index("ix_render_jobs_project_created", table_name="render_jobs")
+    op.execute("DROP TRIGGER IF EXISTS trg_render_job_snapshot_immutable ON render_jobs")
+    op.execute("DROP FUNCTION IF EXISTS prevent_render_snapshot_mutation()")
+    op.drop_index("ix_render_jobs_project_created", table_name="render_jobs")
     op.drop_index("ix_render_jobs_status_created", table_name="render_jobs")
     op.drop_table("render_jobs")
