@@ -71,6 +71,7 @@ async def render_claimed_job(
             temp = Path(temp_dir)
             asset_paths: dict[str, str] = {}
             media_audio: dict[str, bool] = {}
+            media_duration: dict[str, float] = {}
             for asset_id in asset_ids:
                 asset = asset_by_id[asset_id]
                 local_path = await asyncio.to_thread(
@@ -81,11 +82,15 @@ async def render_claimed_job(
                 info = await probe_media(str(local_path))
                 asset_paths[str(asset_id)] = str(local_path)
                 media_audio[str(asset_id)] = info.has_audio
+                media_duration[str(asset_id)] = info.duration_seconds
 
             for index, clip in enumerate(clips):
                 asset_id = str(UUID(str(clip["asset_id"])))
                 source_out = float(clip.get("source_out", 0))
-                if source_out > (await probe_media(asset_paths[asset_id])).duration_seconds + 0.05:
+                source_in = float(clip.get("source_in", 0))
+                if source_out <= source_in:
+                    raise RenderWorkerError(f"Clip {index} source_out must be greater than source_in")
+                if source_out > media_duration[asset_id] + 0.05:
                     raise RenderWorkerError(f"Clip {index} source_out exceeds media duration")
 
             output_path = temp / "render.mp4"
