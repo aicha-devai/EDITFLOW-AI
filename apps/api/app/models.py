@@ -73,3 +73,4 @@ class RenderJob(Base):
     next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     progress_percent: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     cancel_requested: Mapped[bool] = mapped_column(default=False, nullable=False, server_default="false")
+    quality_report: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
