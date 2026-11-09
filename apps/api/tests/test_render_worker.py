@@ -53,6 +53,9 @@ async def test_worker_renders_pinned_snapshot_and_stores_output(db_session, tmp_
 
     monkeypatch.setattr(worker_module, "probe_media", fake_probe)
     monkeypatch.setattr(worker_module, "execute_ffmpeg_plan", fake_execute)
+    async def fake_decode(_path, timeout_seconds=3600):
+        return ""
+    monkeypatch.setattr(worker_module, "verify_output_decode", fake_decode)
     finished = await render_claimed_job(
         db_session, job.id, storage, tmp_path / "work", timeout_seconds=10
     )
