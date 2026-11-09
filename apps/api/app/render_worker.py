@@ -80,10 +80,10 @@ async def render_claimed_job(
         await fail_render_job(session, job_id, "Timeline references missing or foreign-project assets", lease_token)
         return job
 
-    await _report_progress(session_factory, job_id, lease_token, 10)
     root = Path(work_root).resolve()
     root.mkdir(parents=True, exist_ok=True)
     try:
+        await _report_progress(session_factory, job_id, lease_token, 10)
         with tempfile.TemporaryDirectory(prefix=f"editflow-{job_id}-", dir=root) as temp_dir:
             temp = Path(temp_dir)
             asset_paths: dict[str, str] = {}
