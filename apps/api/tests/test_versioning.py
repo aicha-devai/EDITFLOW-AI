@@ -416,3 +416,24 @@ def test_non_empty_qc_intent_is_included_in_canonical_timeline():
     )
     canonical = canonical_timeline(timeline)
     assert canonical["qc_intent"][0]["kind"] == "black_segment"
+
+
+@pytest.mark.asyncio
+async def test_compare_reports_qc_intent_annotation_changes(db_session):
+    project = Project(title="QC intent diff")
+    db_session.add(project)
+    await db_session.flush()
+    plain = TimelineDocument(project_id=project.id, sequence={"fps": 30})
+    annotated = TimelineDocument(
+        project_id=project.id,
+        sequence={"fps": 30},
+        qc_intent=[{
+            "kind": "black_segment", "start_seconds": 3, "end_seconds": 4,
+            "reason": "Intentional blackout before reveal",
+        }],
+    )
+    await save_timeline(db_session, project.id, plain, 0)
+    await save_timeline(db_session, project.id, annotated, 1)
+    diff = await compare_versions(db_session, project.id, 1, 2)
+    assert diff["qc_intent_changes"]["before"] == []
+    assert diff["qc_intent_changes"]["after"][0]["kind"] == "black_segment"
