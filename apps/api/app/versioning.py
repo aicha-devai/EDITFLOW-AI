@@ -14,6 +14,9 @@ class ProjectNotFound(Exception):
 
 def canonical_timeline(timeline: TimelineDocument) -> dict:
     data = timeline.model_dump(mode="json")
+    # Preserve hashes for pre-QC timeline revisions that never had this optional field.
+    if not data.get("qc_intent"):
+        data.pop("qc_intent", None)
     data["version"] = 0
     return data
 
