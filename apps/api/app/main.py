@@ -112,6 +112,7 @@ async def get_project_render(project_id: UUID, job_id: UUID, db: AsyncSession = 
             "render_profile": job.render_profile,
             "output_object_key": job.output_object_key,
             "error_message": job.error_message,
+            "quality_report": job.quality_report,
             "attempts": job.attempts,
             "max_attempts": job.max_attempts,
             "progress_percent": job.progress_percent,
