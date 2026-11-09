@@ -15,7 +15,7 @@
 11. Render jobs must persist a `timeline_version_id` and render only that immutable snapshot (worker integration pending).
 12. Version creation, asset references, and current pointer update run in one database transaction.
 13. Project authorization/RBAC is not yet implemented and must be added before exposing this API publicly.
-14. PostgreSQL concurrency and rollback tests are required before declaring the feature production-ready.
+14. PostgreSQL tests cover rollback and two independent concurrent writers; CI runs these against PostgreSQL.
 
 ## Canonicalization
 
@@ -32,5 +32,5 @@ A restore copies the selected immutable snapshot into a new version. It does not
 ## Current implementation limits
 
 - This is the first backend slice, not a complete product.
-- Workspace membership/RBAC, idempotency-key persistence, render-job pinning, Alembic migrations, and PostgreSQL integration tests remain to be implemented.
+- Workspace membership/RBAC and render-job pinning remain unimplemented. Alembic migration infrastructure and PostgreSQL integration tests are present; the latest CI run must pass before treating the migration change as verified.
 - Run tests against PostgreSQL, not SQLite, because row locking and JSONB behavior are PostgreSQL-specific.
