@@ -176,7 +176,7 @@ async def complete_render_job(session: AsyncSession, job_id: uuid.UUID, output_o
         job.lease_token = None
         job.lease_expires_at = None
         await session.flush()
-        raise RenderCancelled("Render cancellation was requested")
+        return job
     if not output_object_key.strip():
         raise ValueError("output_object_key is required")
     job.output_object_key = output_object_key
