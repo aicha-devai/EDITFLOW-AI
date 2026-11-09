@@ -48,7 +48,7 @@ PostgreSQL integration tests cover:
 - Strict dimension, timing, encoder-profile, and asset-resolution validation.
 - Argument-array execution (no shell command concatenation).
 
-The planner intentionally rejects custom transforms for now. `app.render_executor.execute_ffmpeg_plan` now launches FFmpeg with an argument array (never a shell), applies a bounded timeout, captures bounded diagnostic text, and verifies that a non-empty output file exists. A worker must resolve paths and probe audio streams before calling the planner. Neither module downloads assets nor uploads outputs.
+The planner intentionally rejects custom transforms for now. `app.render_executor.execute_ffmpeg_plan` now launches FFmpeg with an argument array (never a shell), applies a bounded timeout, captures bounded diagnostic text, and verifies that a non-empty output file exists. `app.media_probe.probe_media` now uses `ffprobe` to inspect duration, video/audio streams, codecs, and dimensions. `app.storage.LocalObjectStorage` provides a traversal-safe local filesystem adapter for development. `app.render_worker.render_claimed_job` resolves project-owned asset IDs from the pinned snapshot, materializes local media, probes it, validates source ranges, builds the plan, executes FFmpeg, stores the output, and records job completion/failure. The dedicated `app.worker_main` process polls and claims jobs in a short transaction, then renders outside the claim transaction. The Docker image installs FFmpeg/ffprobe and Compose starts a separate `render-worker` service after the API health check.
 
 ## Not yet implemented
 
