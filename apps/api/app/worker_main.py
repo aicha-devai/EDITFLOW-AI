@@ -75,6 +75,7 @@ async def run_worker() -> None:
                         result = await render_claimed_job(
                             session, job_id, storage, work_root,
                             timeout_seconds=timeout_seconds, lease_token=lease_token,
+                            session_factory=sessions,
                         )
                         logger.info("Job %s finished status=%s progress=%s", job_id, result.status, result.progress_percent)
             except (LeaseLost, RenderCancelled) as exc:
