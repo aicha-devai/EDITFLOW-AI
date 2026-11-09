@@ -3,7 +3,7 @@ import pytest
 from sqlalchemy import select, func
 from app.models import Asset, Project, TimelineVersion
 from app.schemas import TimelineDocument
-from app.versioning import save_timeline, restore_version, compare_versions, VersionConflict
+from app.versioning import save_timeline, restore_version, compare_versions, VersionConflict, canonical_timeline
 
 @pytest.mark.asyncio
 async def test_first_save_and_unchanged_timeline_is_noop(db_session):
@@ -394,3 +394,25 @@ async def test_expired_lease_cannot_complete_before_reclaim(db_session):
     await db_session.flush()
     with pytest.raises(LeaseLost):
         await complete_render_job(db_session, job.id, "renders/late.mp4", claimed.lease_token)
+
+
+def test_empty_qc_intent_does_not_change_legacy_canonical_timeline_shape():
+    project_id = uuid.uuid4()
+    timeline = TimelineDocument(project_id=project_id, sequence={"fps": 30})
+    canonical = canonical_timeline(timeline)
+    assert "qc_intent" not in canonical
+
+
+def test_non_empty_qc_intent_is_included_in_canonical_timeline():
+    project_id = uuid.uuid4()
+    timeline = TimelineDocument(
+        project_id=project_id,
+        qc_intent=[{
+            "kind": "black_segment",
+            "start_seconds": 1,
+            "end_seconds": 2,
+            "reason": "Intentional transition",
+        }],
+    )
+    canonical = canonical_timeline(timeline)
+    assert canonical["qc_intent"][0]["kind"] == "black_segment"
