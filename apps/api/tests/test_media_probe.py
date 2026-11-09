@@ -23,7 +23,7 @@ class FakeProcess:
 async def test_probe_media_reports_video_and_audio_streams(monkeypatch):
     async def fake_create(*args, **kwargs):
         return FakeProcess({
-            "format": {"duration": "12.5"},
+            "format": {"duration": "12.5", "format_name": "mov,mp4,m4a,3gp,3g2,mj2"},
             "streams": [
                 {"codec_type": "video", "codec_name": "h264", "width": 1080, "height": 1920},
                 {"codec_type": "audio", "codec_name": "aac"},
@@ -37,6 +37,7 @@ async def test_probe_media_reports_video_and_audio_streams(monkeypatch):
     assert info.has_audio is True
     assert info.width == 1080
     assert info.height == 1920
+    assert info.format_name == "mov,mp4,m4a,3gp,3g2,mj2"
 
 
 @pytest.mark.asyncio
