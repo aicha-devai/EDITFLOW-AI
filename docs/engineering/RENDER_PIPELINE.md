@@ -39,9 +39,21 @@ PostgreSQL integration tests cover:
 6. Attempt to mutate the pinned hash and assert the database trigger rejects it.
 7. Concurrent queue consumers use row locking with `SKIP LOCKED`.
 
+## FFmpeg planner foundation
+
+`app.render_engine.build_ffmpeg_plan` now creates a deterministic FFmpeg argv from the pinned snapshot and a caller-supplied asset-ID-to-local-path map. It supports:
+- Multiple video clips composited over a black sequence canvas at their timeline positions.
+- Source in/out trimming, frame-rate normalization, scale-to-fit with letterboxing, and H.264 output.
+- Optional audio mixing when a worker's media probe confirms which inputs contain audio.
+- Strict dimension, timing, encoder-profile, and asset-resolution validation.
+- Argument-array execution (no shell command concatenation).
+
+The planner intentionally rejects custom transforms for now. It does not probe media, download assets, run FFmpeg, or upload outputs. A worker must resolve paths and probe audio streams before calling it.
+
 ## Not yet implemented
 
-- FFmpeg command planner/executor and media probing.
+- FFmpeg process executor, timeout/resource limits, cancellation, and process telemetry.
+- Media probing (ffprobe) and object-storage download/upload adapter with signed URLs.
 - Object-storage upload/download adapter and signed URLs.
-- Progress events, cancellation, retries/lease expiry, and distributed queue telemetry.
+- Progress events, retries/lease expiry, and distributed queue telemetry.
 - Workspace RBAC; render endpoints must not be exposed publicly before authorization is added.
