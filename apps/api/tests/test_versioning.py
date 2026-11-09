@@ -378,3 +378,19 @@ async def test_queued_job_can_be_cancelled_without_worker_claim(db_session):
     job, _ = await create_render_job(db_session, project.id)
     result = await request_render_cancellation(db_session, project.id, job.id)
     assert result.status == "cancelled"
+
+
+@pytest.mark.asyncio
+async def test_expired_lease_cannot_complete_before_reclaim(db_session):
+    from datetime import datetime, timezone, timedelta
+    from app.rendering import create_render_job, claim_next_render_job, complete_render_job, LeaseLost
+    project = Project(title="Expired lease fencing")
+    db_session.add(project)
+    await db_session.flush()
+    await save_timeline(db_session, project.id, TimelineDocument(project_id=project.id), 0)
+    job, _ = await create_render_job(db_session, project.id)
+    claimed = await claim_next_render_job(db_session, lease_seconds=30)
+    claimed.lease_expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+    await db_session.flush()
+    with pytest.raises(LeaseLost):
+        await complete_render_job(db_session, job.id, "renders/late.mp4", claimed.lease_token)
