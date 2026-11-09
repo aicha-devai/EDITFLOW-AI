@@ -1,23 +1,26 @@
 import os
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import pytest_asyncio
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-from app.models import Base
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 @pytest_asyncio.fixture
 async def db_session():
     url = os.environ.get("DATABASE_URL")
     if not url:
-        raise RuntimeError("DATABASE_URL must point to a PostgreSQL test database")
+        raise RuntimeError("DATABASE_URL must point to a migrated PostgreSQL test database")
     engine = create_async_engine(url)
+    # CI applies Alembic migrations before pytest. Preserve the migrated schema and
+    # truncate data only, so PostgreSQL triggers and constraints are exercised.
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.execute(text(
+            "TRUNCATE TABLE render_jobs, timeline_asset_references, "
+            "timeline_versions, assets, projects RESTART IDENTITY CASCADE"
+        ))
     factory = async_sessionmaker(engine, expire_on_commit=False)
     async with factory() as session:
         yield session
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
     await engine.dispose()
