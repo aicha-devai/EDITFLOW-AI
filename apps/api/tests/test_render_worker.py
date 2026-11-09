@@ -21,18 +21,11 @@ async def test_worker_renders_pinned_snapshot_and_stores_output(db_session, tmp_
     asset = Asset(project_id=project.id, object_key="uploads/source.mp4")
     db_session.add(asset)
     await db_session.flush()
-
     timeline = TimelineDocument(
         project_id=project.id,
         sequence={"width": 1080, "height": 1920, "fps": 30},
-        clips=[{
-            "id": uuid.uuid4(),
-            "asset_id": asset.id,
-            "track_id": "V1",
-            "timeline_start": 0,
-            "source_in": 0,
-            "source_out": 2,
-        }],
+        clips=[{"id": uuid.uuid4(), "asset_id": asset.id, "track_id": "V1",
+                "timeline_start": 0, "source_in": 0, "source_out": 2}],
     )
     await save_timeline(db_session, project.id, timeline, expected_version=0)
     job, _ = await create_render_job(db_session, project.id)
@@ -45,6 +38,12 @@ async def test_worker_renders_pinned_snapshot_and_stores_output(db_session, tmp_
     source.write_bytes(b"fake-media")
 
     async def fake_probe(path):
+        if str(path).endswith("render.mp4"):
+            return SimpleNamespace(
+                duration_seconds=2.0, has_video=True, has_audio=False,
+                width=1080, height=1920, video_codec="h264",
+                audio_codec=None, format_name="mov,mp4,m4a,3gp,3g2,mj2",
+            )
         return SimpleNamespace(duration_seconds=5.0, has_audio=False)
 
     async def fake_execute(plan, timeout_seconds=3600):
@@ -54,7 +53,6 @@ async def test_worker_renders_pinned_snapshot_and_stores_output(db_session, tmp_
 
     monkeypatch.setattr(worker_module, "probe_media", fake_probe)
     monkeypatch.setattr(worker_module, "execute_ffmpeg_plan", fake_execute)
-
     finished = await render_claimed_job(
         db_session, job.id, storage, tmp_path / "work", timeout_seconds=10
     )
@@ -62,3 +60,53 @@ async def test_worker_renders_pinned_snapshot_and_stores_output(db_session, tmp_
     assert finished.status == "succeeded"
     assert finished.output_object_key == f"renders/{project.id}/{job.id}/attempt-1.mp4"
     assert storage._resolve(finished.output_object_key).read_bytes() == b"rendered-video"
+
+
+@pytest.mark.asyncio
+async def test_worker_fails_job_and_does_not_publish_invalid_output(db_session, tmp_path, monkeypatch):
+    import app.render_worker as worker_module
+
+    project = Project(title="Invalid output must not publish")
+    db_session.add(project)
+    await db_session.flush()
+    asset = Asset(project_id=project.id, object_key="uploads/source.mp4")
+    db_session.add(asset)
+    await db_session.flush()
+    timeline = TimelineDocument(
+        project_id=project.id,
+        sequence={"width": 1080, "height": 1920, "fps": 30},
+        clips=[{"id": uuid.uuid4(), "asset_id": asset.id, "track_id": "V1",
+                "timeline_start": 0, "source_in": 0, "source_out": 2}],
+    )
+    await save_timeline(db_session, project.id, timeline, expected_version=0)
+    job, _ = await create_render_job(db_session, project.id)
+    await claim_next_render_job(db_session)
+
+    storage = LocalObjectStorage(tmp_path / "invalid-objects")
+    source = storage.root / "uploads" / "source.mp4"
+    source.parent.mkdir(parents=True)
+    source.write_bytes(b"fake-media")
+
+    async def fake_probe(path):
+        if str(path).endswith("render.mp4"):
+            return SimpleNamespace(
+                duration_seconds=2.0, has_video=True, has_audio=False,
+                width=640, height=360, video_codec="h264",
+                audio_codec=None, format_name="mov,mp4,m4a,3gp,3g2,mj2",
+            )
+        return SimpleNamespace(duration_seconds=5.0, has_audio=False)
+
+    async def fake_execute(plan, timeout_seconds=3600):
+        from pathlib import Path
+        Path(plan.output_path).write_bytes(b"encoded-but-wrong-size")
+        return SimpleNamespace(output_path=plan.output_path, stderr_tail="")
+
+    monkeypatch.setattr(worker_module, "probe_media", fake_probe)
+    monkeypatch.setattr(worker_module, "execute_ffmpeg_plan", fake_execute)
+    finished = await render_claimed_job(
+        db_session, job.id, storage, tmp_path / "invalid-work", timeout_seconds=10
+    )
+
+    assert finished.status == "queued"  # retry policy requeues a failed attempt
+    assert "width mismatch" in finished.error_message
+    assert finished.output_object_key is None
