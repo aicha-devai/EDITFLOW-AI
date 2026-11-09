@@ -1,11 +1,12 @@
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://editflow:editflow@localhost:5432/editflow"
     api_title: str = "EDITFLOW AI API"
-    storage_backend: str = "local"
-    storage_root: str = "/var/lib/editflow"
+    storage_backend: str = Field(default="local", validation_alias="EDITFLOW_STORAGE_BACKEND")
+    storage_root: str = Field(default="/var/lib/editflow", validation_alias="EDITFLOW_STORAGE_ROOT")
     s3_bucket: str | None = None
     s3_region: str = "us-east-1"
     s3_endpoint_url: str | None = None
