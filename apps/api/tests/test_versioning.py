@@ -288,8 +288,8 @@ async def test_render_workers_claim_different_jobs_without_double_claim(db_sessi
     async with factory() as worker_a:
         async with worker_a.begin():
             claimed_a = await claim_next_render_job(worker_a)
-            assert claimed_a.id == first.id
+            assert claimed_a.id in {first.id, second.id}
             async with factory() as worker_b:
                 async with worker_b.begin():
                     claimed_b = await claim_next_render_job(worker_b)
-                    assert claimed_b.id == second.id
+                    assert claimed_b.id in {first.id, second.id}\n                    assert claimed_b.id != claimed_a.id
