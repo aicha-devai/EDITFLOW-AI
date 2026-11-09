@@ -21,10 +21,12 @@ CREATE TABLE IF NOT EXISTS timeline_versions (
     parent_version_id UUID NULL REFERENCES timeline_versions(id),
     timeline_json JSONB NOT NULL,
     content_hash VARCHAR(64) NOT NULL,
+    idempotency_key VARCHAR(128),
     restored_from_version_id UUID NULL REFERENCES timeline_versions(id),
     message TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    CONSTRAINT uq_timeline_version_number UNIQUE(project_id, version)
+    CONSTRAINT uq_timeline_version_number UNIQUE(project_id, version),
+    CONSTRAINT uq_timeline_version_idempotency UNIQUE(project_id, idempotency_key)
 );
 
 ALTER TABLE projects
