@@ -35,7 +35,7 @@ async def test_quality_analysis_reports_black_freeze_silence_and_clipping(monkey
                 "black_start:0.500 black_end:1.500 black_duration:1.000\\n"
                 "freeze_start:3.000 freeze_end:6.000 freeze_duration:3.000\\n"
                 "silence_start:7.000 silence_end:8.500 silence_duration:1.500\\n"
-                "Peak level dB: -0.05\\nNumber of clipped samples: 4\\n"
+                "Peak level dB: 0.00\\n"
             ).encode()
 
     captured = {}
@@ -48,9 +48,9 @@ async def test_quality_analysis_reports_black_freeze_silence_and_clipping(monkey
 
     codes = {item["code"] for item in report["findings"]}
     assert {"black_segment", "frozen_scene", "audio_silence",
-            "audio_clipping", "audio_peak_near_full_scale"} <= codes
+            "audio_clipping"} <= codes
     assert report["status"] == "warnings"
-    assert report["summary"]["warning_count"] == 5
+    assert report["summary"]["warning_count"] == 4
     assert "blackdetect" in " ".join(captured["argv"])
     assert "freezedetect" in " ".join(captured["argv"])
     assert "silencedetect" in " ".join(captured["argv"])
@@ -136,3 +136,22 @@ def test_timeline_qc_intent_requires_valid_non_empty_time_range():
             kind="frozen_scene", start_seconds=5, end_seconds=2,
             reason="Invalid interval",
         )
+
+
+@pytest.mark.asyncio
+async def test_near_full_scale_audio_peak_warns_without_claiming_clipping(monkeypatch):
+    import app.perceptual_qc as qc
+
+    class FakeProcess:
+        returncode = 0
+        async def communicate(self):
+            return b"", b"Peak level dB: -0.05\\n"
+
+    async def fake_exec(*argv, **kwargs):
+        return FakeProcess()
+
+    monkeypatch.setattr(qc.asyncio, "create_subprocess_exec", fake_exec)
+    report = await qc.analyze_render_quality("near-clip.mp4", includes_audio=True)
+    codes = {item["code"] for item in report["findings"]}
+    assert "audio_peak_near_full_scale" in codes
+    assert "audio_clipping" not in codes
