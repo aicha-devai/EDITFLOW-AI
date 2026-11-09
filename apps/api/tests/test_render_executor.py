@@ -130,11 +130,13 @@ async def test_decode_verification_kills_ffmpeg_on_timeout(monkeypatch):
         returncode = -9
         def __init__(self):
             self.killed = False
+            self.finished = asyncio.Event()
         async def communicate(self):
-            await asyncio.Event().wait()
+            await self.finished.wait()
             return b"", b""
         def kill(self):
             self.killed = True
+            self.finished.set()
 
     process = BlockingProcess()
 
