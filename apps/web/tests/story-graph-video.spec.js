@@ -61,15 +61,15 @@ test.beforeEach(async ({ page }) => {
       if (!state.has(video)) state.set(video, { currentTime: 0, paused: true, playCalls: 0 });
       return state.get(video);
     };
-    Object.defineProperty(HTMLMediaElement.prototype, "duration", {
+    Object.defineProperty(HTMLVideoElement.prototype, "duration", {
       configurable: true,
       get: () => 60,
     });
-    Object.defineProperty(HTMLMediaElement.prototype, "readyState", {
+    Object.defineProperty(HTMLVideoElement.prototype, "readyState", {
       configurable: true,
       get: () => 1,
     });
-    Object.defineProperty(HTMLMediaElement.prototype, "currentTime", {
+    Object.defineProperty(HTMLVideoElement.prototype, "currentTime", {
       configurable: true,
       get() { return ensure(this).currentTime; },
       set(value) {
@@ -77,19 +77,19 @@ test.beforeEach(async ({ page }) => {
         this.dispatchEvent(new Event("seeked"));
       },
     });
-    Object.defineProperty(HTMLMediaElement.prototype, "paused", {
+    Object.defineProperty(HTMLVideoElement.prototype, "paused", {
       configurable: true,
       get() { return ensure(this).paused; },
     });
-    HTMLMediaElement.prototype.load = function () {};
-    HTMLMediaElement.prototype.play = function () {
+    HTMLVideoElement.prototype.load = function () {};
+    HTMLVideoElement.prototype.play = function () {
       const media = ensure(this);
       media.paused = false;
       media.playCalls += 1;
       this.dispatchEvent(new Event("play"));
       return Promise.resolve();
     };
-    HTMLMediaElement.prototype.pause = function () {
+    HTMLVideoElement.prototype.pause = function () {
       ensure(this).paused = true;
       this.dispatchEvent(new Event("pause"));
     };
@@ -160,7 +160,7 @@ test("untimed relationship evidence has no jump control and does not move playba
     el.dispatchEvent(new Event("timeupdate"));
   });
 
-  await page.locator('[data-edge="character-shot"]').click();
+  await page.getByRole("button", { name: "Inspect relationship: appears in" }).click();
 
   await expect(page.getByText("Unaligned narration")).toBeVisible();
   await expect(page.locator(".evidence-card [data-jump-time]")).toHaveCount(0);
