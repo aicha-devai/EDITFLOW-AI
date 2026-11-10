@@ -185,6 +185,7 @@ function seekToTimestamp(value, autoplay = true) {
     try { video.currentTime = target; } catch { return; }
     state.playbackSeconds = target;
     state.pendingSeekSeconds = null;
+    updateActiveEvidence(target);
     const time = $("#player-time");
     if (time) time.textContent = fmtTime(target);
     if (autoplay) {
