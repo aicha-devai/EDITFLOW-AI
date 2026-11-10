@@ -9,6 +9,8 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
+from app.evidence_extraction import EvidenceExtractionError, extract_render_evidence
 from app.media_probe import probe_media
 from app.models import Asset, RenderJob
 from app.render_engine import build_ffmpeg_plan
@@ -32,12 +34,28 @@ async def _report_progress(session_factory, job_id: UUID, lease_token: UUID, pro
                                         lease_seconds=120, progress_percent=progress)
 
 
+def _attach_signal_observations(evidence: dict, findings: list[dict]) -> None:
+    """Turn measured, timestamped signal findings into explicit audio evidence."""
+    observations = evidence.setdefault("audio_observations", [])
+    for finding in findings:
+        if finding.get("code") != "audio_silence":
+            continue
+        start, end = finding.get("start_seconds"), finding.get("end_seconds")
+        if start is None or end is None:
+            continue
+        observations.append({
+            "start_seconds": float(start), "end_seconds": float(end),
+            "description": "FFmpeg signal analysis detected sustained audio silence in this interval.",
+            "source": "ffmpeg.silencedetect",
+        })
+
+
 async def render_claimed_job(
     session: AsyncSession, job_id: UUID, storage: LocalObjectStorage,
     work_root: str | Path, timeout_seconds: int = 3600,
     lease_token: UUID | None = None, session_factory=None,
 ) -> RenderJob:
-    """Resolve pinned assets, render, verify the encoded file, then publish its key."""
+    """Resolve pinned assets, render, verify, extract evidence, then publish."""
     job = await session.scalar(select(RenderJob).where(RenderJob.id == job_id))
     if job is None:
         raise LookupError("Render job does not exist")
@@ -93,17 +111,52 @@ async def render_claimed_job(
             plan = build_ffmpeg_plan(snapshot, asset_paths, str(output_path),
                                      render_profile=job.render_profile, asset_has_audio=media_audio)
             await execute_ffmpeg_plan(plan, timeout_seconds=timeout_seconds)
-            # A zero exit code is not sufficient: ffprobe must decode valid MP4 metadata.
             output_info = await probe_media(str(output_path))
             validate_render_output(output_path, plan, output_info)
-            # Decode every video/audio stream end-to-end; do not publish if any frame/packet fails.
             await verify_output_decode(str(output_path), timeout_seconds=timeout_seconds)
-            # Perceptual findings are advisory: intentional black cuts, holds, and silence must remain renderable.
             quality_report = await analyze_render_quality(
                 str(output_path), includes_audio=plan.includes_audio,
                 timeout_seconds=min(timeout_seconds, 900),
                 intent_annotations=[item for item in snapshot.get("qc_intent", [])],
             )
+
+            # Evidence extraction is advisory: a valid render remains publishable if
+            # optional ASR or representative-frame extraction is unavailable.
+            evidence_root = temp / "evidence"
+            try:
+                evidence = await extract_render_evidence(
+                    str(output_path), evidence_root,
+                    duration_seconds=output_info.duration_seconds,
+                    includes_audio=plan.includes_audio,
+                    asr_api_key=settings.evidence_asr_api_key,
+                    asr_endpoint=settings.evidence_asr_endpoint,
+                    asr_model=settings.evidence_asr_model,
+                    timeout_seconds=min(timeout_seconds, settings.evidence_extraction_timeout_seconds),
+                )
+                _attach_signal_observations(evidence, quality_report.get("findings", []))
+                evidence_prefix = f"evidence/{job.project_id}/{job.id}/attempt-{job.attempts}"
+                for frame in evidence.get("keyframes", []):
+                    frame_path = evidence_root / "frames" / frame["filename"]
+                    frame_key = f"{evidence_prefix}/frames/{frame['filename']}"
+                    await asyncio.to_thread(storage.put_file, frame_path, frame_key)
+                    frame["object_key"] = frame_key
+                    frame.pop("filename", None)
+                audio_artifact = evidence.get("audio_artifact")
+                if audio_artifact:
+                    audio_path = evidence_root / audio_artifact["filename"]
+                    audio_key = f"{evidence_prefix}/audio.mp3"
+                    await asyncio.to_thread(storage.put_file, audio_path, audio_key)
+                    audio_artifact["object_key"] = audio_key
+                    audio_artifact.pop("filename", None)
+                quality_report["evidence"] = evidence
+            except EvidenceExtractionError as exc:
+                quality_report["evidence"] = {
+                    "schema_version": "1.0", "extraction_status": "failed",
+                    "error": str(exc)[:1000], "keyframes": [],
+                    "transcript_segments": [], "visual_observations": [],
+                    "audio_observations": [], "visual_semantics_status": "not_configured",
+                }
+
             job.quality_report = quality_report
             await session.flush()
             await _report_progress(session_factory, job_id, lease_token, 90)
