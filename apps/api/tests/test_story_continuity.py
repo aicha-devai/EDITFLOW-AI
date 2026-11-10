@@ -32,6 +32,8 @@ def test_graph_links_story_beats_to_timestamped_narration_visuals_and_shots():
     ))
     assert result["status"] == "completed"
     assert result["integrity"]["all_edges_have_evidence"] is True
+    node_ids = {node["id"] for node in result["nodes"]}
+    assert all(edge["source"] in node_ids and edge["target"] in node_ids for edge in result["edges"])
     assert any(edge["type"] == "precedes" for edge in result["edges"])
     assert any(edge["type"] == "narrates" and edge["source"] == "transcript:0" for edge in result["edges"])
     assert any(edge["type"] == "observed_during" and edge["source"] == "visual:0" for edge in result["edges"])
@@ -93,3 +95,16 @@ def test_graph_rejects_entities_without_timestamped_evidence():
     assert nodes == []
     assert edges == []
     assert rejected == ["entity_missing_type_name_or_grounded_evidence"]
+
+
+
+def test_graph_falls_back_to_clip_ranges_when_story_beats_are_not_timed():
+    result = asyncio.run(build_story_continuity_graph(
+        {"sequence": {"story_beats": [{"id": "untimed"}]},
+         "clips": [{"id": "clip-1", "timeline_start": 2, "source_in": 1,
+                    "source_out": 4, "rationale": "Establish the location"}]},
+        {"transcript_segments": [], "visual_observations": [], "keyframes": []},
+    ))
+    beat = next(node for node in result["nodes"] if node["type"] == "story_beat")
+    assert beat["start_seconds"] == 2
+    assert beat["end_seconds"] == 5
