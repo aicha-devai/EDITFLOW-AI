@@ -69,6 +69,30 @@ async def _scene_change_timestamps(video_path: str, threshold: float, timeout_se
     )]
 
 
+async def _perceptual_hash(image_path: str | Path) -> str | None:
+    """Compute a compact 64-bit difference hash using FFmpeg only."""
+    try:
+        raw, _ = await _run([
+            "ffmpeg", "-hide_banner", "-loglevel", "error", "-nostdin",
+            "-i", str(image_path), "-vf", "scale=9:8:flags=area,format=gray",
+            "-frames:v", "1", "-f", "rawvideo", "-",
+        ], 30)
+    except EvidenceExtractionError:
+        return None
+    if len(raw) < 72:
+        return None
+    bits = 0
+    bit_index = 0
+    for row in range(8):
+        for column in range(8):
+            left = raw[row * 9 + column]
+            right = raw[row * 9 + column + 1]
+            if left > right:
+                bits |= 1 << bit_index
+            bit_index += 1
+    return f"{bits:016x}"
+
+
 async def extract_representative_keyframes(
     video_path: str, output_dir: str | Path, *, duration_seconds: float,
     sample_interval_seconds: float = 5.0, scene_threshold: float = 0.30,
@@ -108,6 +132,7 @@ async def extract_representative_keyframes(
         next_time = timestamps[index + 1] if index + 1 < len(timestamps) else duration_seconds
         frames.append({
             "timestamp_seconds": timestamp,
+            "perceptual_hash": await _perceptual_hash(output),
             "end_seconds": round(max(timestamp, next_time), 3),
             "filename": filename,
             "sample_type": "scene_change" if any(abs(timestamp - item) < 0.002 for item in scene_times)
