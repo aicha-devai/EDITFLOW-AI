@@ -135,7 +135,7 @@ function renderEvidenceTrack() {
   }).join("")}</div></div>`;
 }
 function findCurrentEvidence(seconds) {
-  const nodes = (state.graph?.nodes || []).filter(node => Number.isFinite(Number(node.start_seconds)));
+  const nodes = (state.graph?.nodes || []).filter(node => node.start_seconds !== null && node.start_seconds !== undefined && Number.isFinite(Number(node.start_seconds)));
   const covering = nodes.filter(node => {
     const start = Number(node.start_seconds);
     const end = Number.isFinite(Number(node.end_seconds)) ? Number(node.end_seconds) : start;
@@ -146,10 +146,10 @@ function findCurrentEvidence(seconds) {
 function updateActiveEvidence(seconds) {
   const active = findCurrentEvidence(seconds);
   state.currentEvidenceId = active?.id || null;
-  $(".evidence-marker").forEach(el => {
+  $$(".evidence-marker").forEach(el => {
     el.classList.toggle("is-playing", Boolean(active && el.dataset.evidenceNode === active.id));
   });
-  $(".graph-node").forEach(el => el.classList.toggle("node-playing", Boolean(active && el.dataset.node === active.id)));
+  $$(".graph-node").forEach(el => el.classList.toggle("node-playing", Boolean(active && el.dataset.node === active.id)));
   const label = $("#active-evidence-label");
   if (label) label.textContent = active ? `Now: ${nodeTitle(active)} · ${fmtTime(active.start_seconds)}` : "No active evidence at this time";
 }
@@ -397,15 +397,15 @@ function bindExplorer() {
     el.addEventListener("click",select);
     el.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();select();}});
   });
-  $("[data-edge]").forEach(el=>el.addEventListener("click",()=>{const edge=state.graph.edges.find(x=>x.id===el.dataset.edge);state.selectedEdgeId=el.dataset.edge;state.selectedId=null;render();const ref=(edge?.evidence_refs||[]).map(evidenceFor).filter(Boolean).sort((a,b)=>(a.start_seconds??Infinity)-(b.start_seconds??Infinity))[0];if(ref && Number.isFinite(Number(ref.start_seconds)))seekToTimestamp(ref.start_seconds);}));
-  $("[data-inspect-edge]").forEach(el=>el.addEventListener("click",()=>{const edge=state.graph.edges.find(x=>x.id===el.dataset.inspectEdge);state.selectedEdgeId=el.dataset.inspectEdge;state.selectedId=null;render();const ref=(edge?.evidence_refs||[]).map(evidenceFor).filter(Boolean).sort((a,b)=>(a.start_seconds??Infinity)-(b.start_seconds??Infinity))[0];if(ref && Number.isFinite(Number(ref.start_seconds)))seekToTimestamp(ref.start_seconds);}));
-  $("[data-select-node]").forEach(el=>el.addEventListener("click",()=>{const node=evidenceFor(el.dataset.selectNode);state.selectedId=el.dataset.selectNode;state.selectedEdgeId=null;render();if(node && Number.isFinite(Number(node.start_seconds)))seekToTimestamp(node.start_seconds);}));
-  $("[data-evidence-node]").forEach(el=>el.addEventListener("click",()=>{
+  $$("[data-edge]").forEach(el=>el.addEventListener("click",()=>{const edge=state.graph.edges.find(x=>x.id===el.dataset.edge);state.selectedEdgeId=el.dataset.edge;state.selectedId=null;render();const ref=(edge?.evidence_refs||[]).map(evidenceFor).filter(Boolean).sort((a,b)=>(a.start_seconds??Infinity)-(b.start_seconds??Infinity))[0];if(ref && Number.isFinite(Number(ref.start_seconds)))seekToTimestamp(ref.start_seconds);}));
+  $$("[data-inspect-edge]").forEach(el=>el.addEventListener("click",()=>{const edge=state.graph.edges.find(x=>x.id===el.dataset.inspectEdge);state.selectedEdgeId=el.dataset.inspectEdge;state.selectedId=null;render();const ref=(edge?.evidence_refs||[]).map(evidenceFor).filter(Boolean).sort((a,b)=>(a.start_seconds??Infinity)-(b.start_seconds??Infinity))[0];if(ref && Number.isFinite(Number(ref.start_seconds)))seekToTimestamp(ref.start_seconds);}));
+  $$("[data-select-node]").forEach(el=>el.addEventListener("click",()=>{const node=evidenceFor(el.dataset.selectNode);state.selectedId=el.dataset.selectNode;state.selectedEdgeId=null;render();if(node && Number.isFinite(Number(node.start_seconds)))seekToTimestamp(node.start_seconds);}));
+  $$("[data-evidence-node]").forEach(el=>el.addEventListener("click",()=>{
     const node=evidenceFor(el.dataset.evidenceNode);
     if(node){state.selectedId=node.id;state.selectedEdgeId=null;render();}
     seekToTimestamp(el.dataset.jumpTime);
   }));
-  $("[data-jump-time]:not([data-evidence-node])").forEach(el=>el.addEventListener("click",()=>seekToTimestamp(el.dataset.jumpTime)));
+  $$("[data-jump-time]:not([data-evidence-node])").forEach(el=>el.addEventListener("click",()=>seekToTimestamp(el.dataset.jumpTime)));
   $("#clear-selection")?.addEventListener("click",()=>{state.selectedId=null;state.selectedEdgeId=null;render();});
   $("#zoom-in")?.addEventListener("click",()=>scaleGraph(1.15));
   $("#zoom-out")?.addEventListener("click",()=>scaleGraph(.87));
