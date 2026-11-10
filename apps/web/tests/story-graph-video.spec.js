@@ -53,49 +53,7 @@ const graphResponse = {
 };
 
 test.beforeEach(async ({ page }) => {
-  // Keep the test deterministic: exercise the real Explorer UI and seek handler,
-  // while replacing browser codec/network timing with a controllable media element.
-  await page.addInitScript(() => {
-    const state = new WeakMap();
-    const ensure = video => {
-      if (!state.has(video)) state.set(video, { currentTime: 0, paused: true, playCalls: 0 });
-      return state.get(video);
-    };
-    const installMediaMock = video => {
-      if (video.dataset.playwrightMediaMock === "installed") return;
-      video.dataset.playwrightMediaMock = "installed";
-      Object.defineProperties(video, {
-        duration: { configurable: true, get: () => 60 },
-        readyState: { configurable: true, get: () => 1 },
-        currentTime: {
-          configurable: true,
-          get() { return ensure(this).currentTime; },
-          set(value) {
-            ensure(this).currentTime = Number(value);
-            this.dispatchEvent(new Event("seeked"));
-          },
-        },
-        paused: { configurable: true, get() { return ensure(this).paused; } },
-      });
-      video.load = function () {};
-      video.play = function () {
-        const media = ensure(this);
-        media.paused = false;
-        media.playCalls += 1;
-        this.dispatchEvent(new Event("play"));
-        return Promise.resolve();
-      };
-      video.pause = function () {
-        ensure(this).paused = true;
-        this.dispatchEvent(new Event("pause"));
-      };
-    };
-    const installExisting = () => document.querySelectorAll("video").forEach(installMediaMock);
-    const observer = new MutationObserver(installExisting);
-    observer.observe(document.documentElement, { childList: true, subtree: true });
-    document.addEventListener("DOMContentLoaded", installExisting, { once: true });
-    installExisting();
-  });
+
 
   await page.route("**/v1/projects/**/renders/**/story-continuity", route =>
     route.fulfill({
@@ -114,7 +72,32 @@ async function loadExplorer(page) {
   await page.locator("#project-input").fill(projectId);
   await page.locator("#job-input").fill(jobId);
   await page.getByRole("button", { name: /load graph/i }).click();
-  await expect(page.locator("#story-video")).toBeVisible();
+  const video = page.locator("#story-video");
+  await expect(video).toBeVisible();
+  await video.evaluate(el => {
+    let currentTime = 0;
+    let paused = true;
+    Object.defineProperties(el, {
+      duration: { configurable: true, get: () => 60 },
+      readyState: { configurable: true, get: () => 1 },
+      currentTime: {
+        configurable: true,
+        get: () => currentTime,
+        set: value => { currentTime = Number(value); },
+      },
+      paused: { configurable: true, get: () => paused },
+    });
+    el.load = () => {};
+    el.play = () => {
+      paused = false;
+      el.dispatchEvent(new Event("play"));
+      return Promise.resolve();
+    };
+    el.pause = () => {
+      paused = true;
+      el.dispatchEvent(new Event("pause"));
+    };
+  });
 }
 
 test("clicking timestamped evidence seeks to its exact timestamp and starts playback", async ({ page }) => {
