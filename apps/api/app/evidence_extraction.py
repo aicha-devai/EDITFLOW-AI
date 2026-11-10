@@ -198,7 +198,7 @@ async def analyze_keyframes_with_vision(
                     "text": (
                         "Describe only directly visible content in each numbered frame. "
                         "Do not infer intent, hidden events, identities, or causes. "
-                        "Return JSON only: {\\"frames\\":[{\\"frame_id\\":string,\\"description\\":string}]}. "
+                        "Return JSON only with this shape: frames -> [{frame_id, description}]. "
                         "Keep each description factual and under 45 words."
                     ),
                 }]
