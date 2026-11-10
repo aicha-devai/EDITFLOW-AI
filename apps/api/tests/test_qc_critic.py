@@ -214,5 +214,10 @@ def test_critic_does_not_claim_multimodal_evidence_when_none_was_supplied():
         "keyframes": [],
         "observations": [],
         "story_beats": [],
+        "extraction_status": "not_available",
+        "transcription_status": "not_available",
+        "transcription_provider": None,
+        "visual_semantics_status": "not_available",
+        "audio_artifact": None,
         "available_modalities": [],
     }
