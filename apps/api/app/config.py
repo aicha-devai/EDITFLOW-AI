@@ -12,8 +12,14 @@ class Settings(BaseSettings):
     s3_endpoint_url: str | None = None
     s3_access_key_id: str | None = None
     s3_secret_access_key: str | None = None
+    evidence_asr_api_key: str | None = Field(default=None, validation_alias="EDITFLOW_ASR_API_KEY")
+    evidence_asr_endpoint: str = Field(
+        default="https://api.openai.com/v1/audio/transcriptions",
+        validation_alias="EDITFLOW_ASR_ENDPOINT",
+    )
+    evidence_asr_model: str = Field(default="whisper-1", validation_alias="EDITFLOW_ASR_MODEL")
+    evidence_extraction_timeout_seconds: int = Field(
+        default=900, ge=30, le=3600, validation_alias="EDITFLOW_EVIDENCE_TIMEOUT_SECONDS"
+    )
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
-
-
-settings = Settings()
