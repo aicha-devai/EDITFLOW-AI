@@ -53,7 +53,35 @@ const graphResponse = {
 };
 
 test.beforeEach(async ({ page }) => {
-
+  // Install the media shim before the app binds its event listeners. The shim
+  // is attached to the prototype so it survives inspector-only and full renders.
+  await page.addInitScript(() => {
+    const mediaState = new WeakMap();
+    const stateFor = element => {
+      if (!mediaState.has(element)) mediaState.set(element, { currentTime: 0, paused: true });
+      return mediaState.get(element);
+    };
+    Object.defineProperties(HTMLMediaElement.prototype, {
+      duration: { configurable: true, get: () => 60 },
+      readyState: { configurable: true, get: () => 1 },
+      currentTime: {
+        configurable: true,
+        get() { return stateFor(this).currentTime; },
+        set(value) { stateFor(this).currentTime = Number(value); },
+      },
+      paused: { configurable: true, get() { return stateFor(this).paused; } },
+    });
+    HTMLMediaElement.prototype.load = function () {};
+    HTMLMediaElement.prototype.play = function () {
+      stateFor(this).paused = false;
+      this.dispatchEvent(new Event("play"));
+      return Promise.resolve();
+    };
+    HTMLMediaElement.prototype.pause = function () {
+      stateFor(this).paused = true;
+      this.dispatchEvent(new Event("pause"));
+    };
+  });
 
   await page.route("**/v1/projects/**/renders/**/story-continuity", route =>
     route.fulfill({
@@ -72,32 +100,7 @@ async function loadExplorer(page) {
   await page.locator("#project-input").fill(projectId);
   await page.locator("#job-input").fill(jobId);
   await page.getByRole("button", { name: /load graph/i }).click();
-  const video = page.locator("#story-video");
-  await expect(video).toBeVisible();
-  await video.evaluate(el => {
-    let currentTime = 0;
-    let paused = true;
-    Object.defineProperties(el, {
-      duration: { configurable: true, get: () => 60 },
-      readyState: { configurable: true, get: () => 1 },
-      currentTime: {
-        configurable: true,
-        get: () => currentTime,
-        set: value => { currentTime = Number(value); },
-      },
-      paused: { configurable: true, get: () => paused },
-    });
-    el.load = () => {};
-    el.play = () => {
-      paused = false;
-      el.dispatchEvent(new Event("play"));
-      return Promise.resolve();
-    };
-    el.pause = () => {
-      paused = true;
-      el.dispatchEvent(new Event("pause"));
-    };
-  });
+  await expect(page.locator("#story-video")).toBeVisible();
 }
 
 test("clicking timestamped evidence seeks to its exact timestamp and starts playback", async ({ page }) => {
@@ -145,7 +148,7 @@ test("untimed relationship evidence has no jump control and does not move playba
     el.dispatchEvent(new Event("timeupdate"));
   });
 
-  await page.getByRole("button", { name: "Inspect relationship: appears in" }).click();
+  await page.locator('[data-edge="character-shot"]').click();
 
   await expect(page.getByText("Unaligned narration")).toBeVisible();
   await expect(page.locator(".evidence-card [data-jump-time]")).toHaveCount(0);
