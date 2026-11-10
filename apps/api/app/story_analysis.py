@@ -107,6 +107,7 @@ def _story_segments(snapshot: dict[str, Any], evidence: dict[str, Any]) -> list[
                     "timestamp_seconds": item.get("timestamp_seconds"),
                     "object_key": item.get("object_key"),
                     "sample_type": item.get("sample_type", "unknown"),
+                    "perceptual_hash": item.get("perceptual_hash"),
                 })
         transcript_text = " ".join(item["text"] for item in words)
         visual_text = " ".join(item["description"] for item in visual_items)
@@ -146,6 +147,37 @@ def _deterministic_sequence_checks(segments: list[dict[str, Any]]) -> list[dict[
                 "evidence_refs": ["story_beat", "keyframes", "visual_observations"],
                 "story_beat_id": segment["id"],
             })
+
+    all_frames = sorted(
+        [frame for segment in segments for frame in segment["keyframes"]
+         if isinstance(frame.get("perceptual_hash"), str) and len(frame["perceptual_hash"]) == 16],
+        key=lambda frame: float(frame["timestamp_seconds"]),
+    )
+    seen_pairs = set()
+    for index, left in enumerate(all_frames):
+        for right in all_frames[index + 1:]:
+            delta = float(right["timestamp_seconds"]) - float(left["timestamp_seconds"])
+            if delta < 1.5:
+                continue
+            try:
+                distance = (int(left["perceptual_hash"], 16) ^ int(right["perceptual_hash"], 16)).bit_count()
+            except ValueError:
+                continue
+            pair = (left.get("object_key"), right.get("object_key"))
+            if distance <= 3 and pair not in seen_pairs:
+                seen_pairs.add(pair)
+                findings.append({
+                    "code": "possible_duplicate_shot",
+                    "severity": "warning",
+                    "start_seconds": float(right["timestamp_seconds"]),
+                    "end_seconds": float(right["timestamp_seconds"]),
+                    "summary": f"Two representative frames are near-identical by 64-bit difference hash (Hamming distance {distance}/64); inspect possible repeated shot.",
+                    "hamming_distance": distance,
+                    "evidence_refs": [
+                        {"timestamp_seconds": left["timestamp_seconds"], "object_key": left.get("object_key")},
+                        {"timestamp_seconds": right["timestamp_seconds"], "object_key": right.get("object_key")},
+                    ],
+                })
 
     for previous, current in zip(segments, segments[1:]):
         gap = current["start_seconds"] - previous["end_seconds"]
