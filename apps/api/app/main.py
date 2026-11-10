@@ -1,6 +1,7 @@
 from uuid import UUID
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.db import get_db
@@ -19,6 +20,7 @@ from app.versioning import (
     save_timeline, list_versions, compare_versions, restore_version,
     VersionConflict, ProjectNotFound,
 )
+from app.storage import create_object_storage, LocalObjectStorage, S3ObjectStorage, StorageError
 
 app = FastAPI(title=settings.api_title, version="0.1.0")
 _allowed_origins = [origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()]
@@ -141,6 +143,38 @@ async def get_project_render(project_id: UUID, job_id: UUID, db: AsyncSession = 
     except RenderJobNotFound:
         raise HTTPException(404, "Render job not found")
 
+
+
+@app.get("/v1/projects/{project_id}/renders/{job_id}/media")
+async def stream_project_render_media(project_id: UUID, job_id: UUID, db: AsyncSession = Depends(get_db)):
+    """Serve the immutable rendered MP4 with browser seeking / HTTP range support."""
+    job = await db.scalar(select(RenderJob).where(
+        RenderJob.id == job_id, RenderJob.project_id == project_id
+    ))
+    if job is None:
+        raise HTTPException(404, "Render job not found")
+    if job.status != "succeeded" or not job.output_object_key:
+        raise HTTPException(409, "Rendered media is not available until the job succeeds")
+    try:
+        storage = create_object_storage(settings)
+        if isinstance(storage, S3ObjectStorage):
+            return RedirectResponse(
+                url=storage.create_download_url(job.output_object_key, expires_seconds=900),
+                status_code=307,
+                headers={"Cache-Control": "private, no-store"},
+            )
+        if isinstance(storage, LocalObjectStorage):
+            path = storage.resolve_path(job.output_object_key)
+            if not path.is_file() or path.stat().st_size <= 0:
+                raise HTTPException(404, "Rendered media file is missing")
+            return FileResponse(
+                path=path,
+                media_type="video/mp4",
+                headers={"Cache-Control": "private, no-store", "Accept-Ranges": "bytes"},
+            )
+        raise HTTPException(500, "Unsupported object storage backend")
+    except StorageError as exc:
+        raise HTTPException(404, "Rendered media could not be resolved") from exc
 
 @app.post("/v1/projects/{project_id}/renders/{job_id}/cancel")
 async def cancel_project_render(project_id: UUID, job_id: UUID, db: AsyncSession = Depends(get_db)):
