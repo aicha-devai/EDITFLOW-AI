@@ -173,8 +173,8 @@ def _temporal_evidence(
         "audio_artifact": audio_artifact if isinstance(audio_artifact, dict) else None,
         "available_modalities": sorted(
             (["transcript"] if transcript else [])
-            + (["visual"] if any(x["modality"] == "visual" for x in observations) else [])
-            + (["audio"] if any(x["modality"] == "audio" for x in observations) else [])
+            + (["visual"] if keyframes or any(x["modality"] == "visual" for x in observations) else [])
+            + (["audio"] if audio_artifact or any(x["modality"] == "audio" for x in observations) else [])
         ),
     }
 
