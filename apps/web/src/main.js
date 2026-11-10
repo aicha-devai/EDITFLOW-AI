@@ -11,6 +11,7 @@ const state = {
   playbackSeconds: 0,
   playbackWasPlaying: false,
   pendingSeekSeconds: null,
+  currentEvidenceId: null,
   selectedId: null,
   selectedEdgeId: null,
   filter: "all",
@@ -121,6 +122,38 @@ function renderWelcome() {
     </section>`;
 }
 
+function renderEvidenceTrack() {
+  const items = (state.graph?.nodes || [])
+    .filter(node => Number.isFinite(Number(node.start_seconds)))
+    .sort((a,b) => Number(a.start_seconds) - Number(b.start_seconds))
+    .slice(0, 160);
+  if (!items.length) return `<div class="evidence-track-empty">No timestamped evidence is available for this render.</div>`;
+  return `<div class="evidence-track-wrap"><div class="evidence-track-heading"><span>TIME-ALIGNED EVIDENCE</span><small>${items.length} markers · select to jump</small></div><div class="evidence-track" aria-label="Timestamped evidence markers">${items.map(node => {
+    const meta = nodeType(node);
+    const active = state.currentEvidenceId === node.id;
+    return `<button class="evidence-marker ${active ? "is-playing" : ""}" data-jump-time="${Number(node.start_seconds)}" title="${escapeHtml(nodeTitle(node))} · ${fmtTime(node.start_seconds)}" aria-label="Jump to ${escapeHtml(nodeTitle(node))} at ${fmtTime(node.start_seconds)}"><i style="--entity:${meta.color}"></i><span>${escapeHtml(nodeTitle(node).slice(0,48))}</span><small>${fmtTime(node.start_seconds)}</small></button>`;
+  }).join("")}</div></div>`;
+}
+function findCurrentEvidence(seconds) {
+  const nodes = (state.graph?.nodes || []).filter(node => Number.isFinite(Number(node.start_seconds)));
+  const covering = nodes.filter(node => {
+    const start = Number(node.start_seconds);
+    const end = Number.isFinite(Number(node.end_seconds)) ? Number(node.end_seconds) : start;
+    return end > start ? seconds >= start && seconds < end : Math.abs(seconds - start) <= 0.45;
+  }).sort((a,b) => Number(b.start_seconds) - Number(a.start_seconds));
+  return covering[0] || null;
+}
+function updateActiveEvidence(seconds) {
+  const active = findCurrentEvidence(seconds);
+  state.currentEvidenceId = active?.id || null;
+  $(".evidence-marker").forEach(el => {
+    const node = state.graph.nodes.find(item => Number(item.start_seconds) === Number(el.dataset.jumpTime) && nodeTitle(item).slice(0,48) === el.querySelector("span")?.textContent);
+    el.classList.toggle("is-playing", Boolean(active && node?.id === active.id));
+  });
+  $(".graph-node").forEach(el => el.classList.toggle("node-playing", Boolean(active && el.dataset.node === active.id)));
+  const label = $("#active-evidence-label");
+  if (label) label.textContent = active ? `Now: ${nodeTitle(active)} · ${fmtTime(active.start_seconds)}` : "No active evidence at this time";
+}
 function renderVideoPlayer() {
   if (!state.mediaUrl) return `
     <section class="video-panel video-unavailable">
@@ -133,7 +166,8 @@ function renderVideoPlayer() {
         <source src="${escapeHtml(state.mediaUrl)}" type="video/mp4">
         Your browser does not support HTML5 video.
       </video>
-      <div class="player-foot"><span>Original rendered output</span><span>Seeking uses source timestamps from the evidence graph</span></div>
+      ${renderEvidenceTrack()}
+      <div class="player-foot"><span>Original rendered output</span><span id="active-evidence-label">No active evidence at this time</span></div>
     </section>`;
 }
 function seekToTimestamp(value, autoplay = true) {
@@ -175,10 +209,12 @@ function bindVideoPlayer() {
   };
   if (video.readyState >= 1) restore();
   else video.addEventListener("loadedmetadata", restore, { once: true });
+  updateActiveEvidence(video.currentTime || state.playbackSeconds);
   video.addEventListener("timeupdate", () => {
     state.playbackSeconds = video.currentTime;
     const time = $("#player-time");
     if (time) time.textContent = fmtTime(video.currentTime);
+    updateActiveEvidence(video.currentTime);
   });
   video.addEventListener("play", () => { state.playbackWasPlaying = true; });
   video.addEventListener("pause", () => { state.playbackWasPlaying = false; });
