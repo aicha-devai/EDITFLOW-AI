@@ -39,6 +39,15 @@ jobs:
         env:
           DATABASE_URL: postgresql+asyncpg://editflow:editflow@localhost:5432/editflow_test
         run: alembic upgrade head
+      - name: Set up Node.js for Story Graph Explorer
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Build Story Graph Explorer
+        working-directory: apps/web
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
       - name: Run PostgreSQL and media integration tests
         working-directory: apps/api
         env:
