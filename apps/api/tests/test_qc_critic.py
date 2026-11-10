@@ -144,3 +144,24 @@ def test_critic_skips_findings_already_classified_as_intentional():
     )
     assert result["proposals"] == []
     assert result["automatic_changes"] == 0
+
+
+
+def test_generic_reveal_note_does_not_mark_black_segment_intentional():
+    result = generate_qc_critic_proposals(
+        {"findings": [{"code": "black_segment", "start_seconds": 3, "end_seconds": 5}]},
+        {"editorial_notes": ["Build suspense for the reveal"], "clips": []},
+    )
+    proposal = result["proposals"][0]
+    assert proposal["recommendation"] == "inspect_as_potential_issue"
+    assert proposal["matched_cues"] == []
+
+
+def test_confidence_is_explicitly_labeled_as_heuristic_not_probability():
+    result = generate_qc_critic_proposals(
+        {"findings": [{"code": "black_segment", "start_seconds": 3, "end_seconds": 5}]},
+        {"editorial_notes": ["Intentional fade to black before the reveal"], "clips": []},
+    )
+    proposal = result["proposals"][0]
+    assert proposal["recommendation"] == "mark_intentional"
+    assert proposal["confidence_type"] == "heuristic_score_not_probability"
