@@ -1,0 +1,296 @@
+import "./styles.css";
+
+const $ = (selector, root = document) => root.querySelector(selector);
+const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+const state = {
+  apiBase: localStorage.getItem("editflow-api-base") || "http://localhost:8000",
+  projectId: "",
+  jobId: "",
+  graph: null,
+  selectedId: null,
+  selectedEdgeId: null,
+  filter: "all",
+  search: "",
+  loading: false,
+  error: "",
+  zoom: 1,
+};
+
+const typeMeta = {
+  character: { label: "Characters", icon: "♙", color: "#b99cff" },
+  place: { label: "Places", icon: "⌖", color: "#61d9c5" },
+  event: { label: "Events", icon: "✳", color: "#ffb86b" },
+  shot: { label: "Shots", icon: "▧", color: "#78aaff" },
+  narration: { label: "Voiceover", icon: "≋", color: "#f18fc2" },
+  visual_observation: { label: "Visual evidence", icon: "◉", color: "#9acb8b" },
+  story_beat: { label: "Story beats", icon: "◈", color: "#e9d77c" },
+};
+const relationLabels = {
+  appears_in: "appears in", located_at: "located at", participates_in: "participates in",
+  depicts: "depicts", mentions: "mentions", precedes: "precedes", supports: "supports",
+  contradicts: "contradicts", causes: "causes", narrates: "narrates",
+  observed_during: "observed during", sampled_during: "sampled during",
+  evidenced_by: "evidenced by", present_during: "present during",
+  temporally_associated_with: "temporally associated with",
+};
+
+function escapeHtml(value = "") {
+  return String(value).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function fmtTime(value) {
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) return "Time unavailable";
+  const seconds = Math.max(0, Number(value));
+  const m = Math.floor(seconds / 60);
+  const s = (seconds % 60).toFixed(1).padStart(4, "0");
+  return `${String(m).padStart(2, "0")}:${s}`;
+}
+function nodeTitle(node) {
+  return node.label || node.name || node.title || node.id;
+}
+function nodeType(node) {
+  return typeMeta[node.type] || { label: node.type || "Other", icon: "◇", color: "#9ca8bb" };
+}
+function evidenceFor(id) {
+  return state.graph?.nodes?.find(n => n.id === id) || null;
+}
+function render() {
+  $("#app").innerHTML = `
+    <div class="shell">
+      <aside class="rail">
+        <div class="brand-mark">E<span>.</span></div>
+        <div class="rail-divider"></div>
+        <button class="rail-button active" title="Story graph">⌘</button>
+        <button class="rail-button" title="Timeline" disabled>▤</button>
+        <button class="rail-button" title="Media" disabled>▧</button>
+        <div class="rail-spacer"></div>
+        <div class="avatar">AI</div>
+      </aside>
+      <main class="workspace">
+        <header class="topbar">
+          <div class="crumb"><span>EDITFLOW AI</span><b>/</b><strong>Story Graph Explorer</strong></div>
+          <div class="top-actions">
+            <span class="live-dot"></span><span class="top-status">Evidence workspace</span>
+            <button class="icon-button" id="settings-btn" title="Connection settings">⚙</button>
+          </div>
+        </header>
+        <section class="intro">
+          <div>
+            <div class="eyebrow">STORY INTELLIGENCE / CONTINUITY</div>
+            <h1>See how your story <em>connects.</em></h1>
+            <p>Explore characters, places, events, shots and narration — linked by timestamped evidence.</p>
+          </div>
+          <div class="integrity-pill"><span>◈</span> Evidence-linked graph</div>
+        </section>
+        <section class="connect-panel" id="connect-panel">
+          <div class="connect-copy"><span class="connect-icon">↗</span><div><strong>Connect a rendered story</strong><small>Load a graph from a completed Render Job.</small></div></div>
+          <form id="load-form" class="load-form">
+            <label>PROJECT ID<input id="project-input" autocomplete="off" placeholder="Project UUID" value="${escapeHtml(state.projectId)}" required></label>
+            <label>RENDER JOB ID<input id="job-input" autocomplete="off" placeholder="Render Job UUID" value="${escapeHtml(state.jobId)}" required></label>
+            <button class="primary-button" type="submit" ${state.loading ? "disabled" : ""}>${state.loading ? "Loading…" : "Load graph"} <span>→</span></button>
+          </form>
+          ${state.error ? `<div class="error-line">⚠ ${escapeHtml(state.error)}</div>` : ""}
+        </section>
+        ${state.graph ? renderExplorer() : renderWelcome()}
+      </main>
+    </div>
+    <div id="settings-modal" class="modal-backdrop hidden">
+      <section class="settings-modal">
+        <div class="modal-head"><div><span class="eyebrow">CONNECTION</span><h2>API settings</h2></div><button id="close-settings" class="icon-button">×</button></div>
+        <label>API BASE URL<input id="api-base-input" value="${escapeHtml(state.apiBase)}" placeholder="http://localhost:8000"></label>
+        <p class="muted">Used by this browser to request graph data from your EDITFLOW AI API.</p>
+        <button id="save-settings" class="primary-button full">Save connection</button>
+      </section>
+    </div>`;
+  bindShell();
+  if (state.graph) bindExplorer();
+}
+function renderWelcome() {
+  return `
+    <section class="welcome">
+      <div class="welcome-art"><div class="orbit orbit-a"></div><div class="orbit orbit-b"></div><div class="orbit orbit-c"></div><div class="orbit-core">✳</div><i class="spark s1"></i><i class="spark s2"></i><i class="spark s3"></i></div>
+      <div class="welcome-text"><span class="eyebrow">YOUR STORY, DECODED</span><h2>A connected view of every story element.</h2><p>Enter a Project ID and a successful Render Job ID above. The explorer will map the graph returned by the API and let you inspect every evidence link.</p><div class="welcome-tags"><span>Characters</span><span>Places</span><span>Events</span><span>Shots</span><span>Voiceover</span></div></div>
+    </section>`;
+}
+function renderExplorer() {
+  const graph = state.graph;
+  const counts = Object.keys(typeMeta).map(type => ({ type, count: graph.nodes.filter(n => n.type === type).length })).filter(x => x.count);
+  const status = graph.status || "unknown";
+  const visibleNodes = filteredNodes();
+  const selected = state.selectedId ? evidenceFor(state.selectedId) : null;
+  return `
+    <section class="stats-row">
+      <div class="stat-card"><span>GRAPH NODES</span><strong>${graph.nodes.length}</strong><small>Story elements & evidence</small></div>
+      <div class="stat-card"><span>RELATIONSHIPS</span><strong>${graph.edges.length}</strong><small>Connected evidence links</small></div>
+      <div class="stat-card"><span>ENTITY EXTRACTION</span><strong class="stat-word">${escapeHtml((graph.entity_extraction_status || "unknown").replaceAll("_"," "))}</strong><small>Semantic extraction state</small></div>
+      <div class="stat-card"><span>GRAPH STATUS</span><strong class="status-word ${status === "completed" ? "good" : "warn"}">${escapeHtml(status.replaceAll("_"," "))}</strong><small>${graph.integrity?.automatic_timeline_changes ?? 0} automatic timeline edits</small></div>
+    </section>
+    <section class="explorer-layout">
+      <div class="graph-column">
+        <div class="graph-toolbar">
+          <div><span class="eyebrow">CONTINUITY MAP</span><h2>Story network</h2></div>
+          <div class="graph-actions"><div class="search-wrap">⌕ <input id="graph-search" placeholder="Find an element…" value="${escapeHtml(state.search)}"></div><button class="icon-button" id="zoom-out" title="Zoom out">−</button><button class="icon-button" id="zoom-in" title="Zoom in">+</button><button class="icon-button" id="fit-graph" title="Fit graph">⤢</button></div>
+        </div>
+        <div class="filter-row"><button class="filter-chip ${state.filter === "all" ? "selected" : ""}" data-filter="all">All <b>${graph.nodes.length}</b></button>${counts.map(x => `<button class="filter-chip ${state.filter === x.type ? "selected" : ""}" data-filter="${x.type}"><i style="--chip:${nodeType({type:x.type}).color}"></i>${nodeType({type:x.type}).label} <b>${x.count}</b></button>`).join("")}</div>
+        <div class="graph-stage" id="graph-stage">
+          ${visibleNodes.length ? renderGraphSvg(visibleNodes) : '<div class="empty-filter">No elements match this filter.</div>'}
+          <div class="graph-legend"><span><i class="line-solid"></i> Timeline / evidence</span><span><i class="line-dashed"></i> Semantic relation</span></div>
+          <div class="graph-hint">Select a node or connection to inspect its evidence</div>
+        </div>
+        <div class="graph-foot"><span>Showing <b>${visibleNodes.length}</b> of <b>${graph.nodes.length}</b> nodes</span><span>Graph is read-only · Original timeline remains unchanged</span></div>
+      </div>
+      <aside class="inspector">
+        ${selected ? renderNodeInspector(selected) : state.selectedEdgeId ? renderEdgeInspector() : renderOverviewInspector()}
+      </aside>
+    </section>
+    ${graph.limitations?.length ? `<section class="limitations"><strong>Analysis limitations</strong>${graph.limitations.map(x => `<p>${escapeHtml(x)}</p>`).join("")}</section>` : ""}
+  `;
+}
+function filteredNodes() {
+  const q = state.search.trim().toLowerCase();
+  return state.graph.nodes.filter(n => (state.filter === "all" || n.type === state.filter) &&
+    (!q || [nodeTitle(n), n.description, n.id].join(" ").toLowerCase().includes(q)));
+}
+function graphLayout(nodes) {
+  const width = 1100, height = 650;
+  const groups = ["character","place","event","story_beat","shot","visual_observation","narration"];
+  const buckets = new Map(groups.map(g => [g, []]));
+  nodes.forEach(n => (buckets.get(n.type) || buckets.get("story_beat")).push(n));
+  const positions = new Map();
+  const laneX = { character: 115, place: 285, event: 455, story_beat: 625, shot: 795, visual_observation: 945, narration: 1060 };
+  groups.forEach(type => {
+    const items = buckets.get(type);
+    items.forEach((node, i) => {
+      const gap = height / (items.length + 1);
+      positions.set(node.id, { x: laneX[type], y: gap * (i + 1), node });
+    });
+  });
+  return { width, height, positions };
+}
+function renderGraphSvg(nodes) {
+  const { width, height, positions } = graphLayout(nodes);
+  const nodeMap = new Map(nodes.map(n => [n.id, n]));
+  const edges = state.graph.edges.filter(e => positions.has(e.source) && positions.has(e.target));
+  const paths = edges.map(edge => {
+    const a = positions.get(edge.source), b = positions.get(edge.target);
+    const mid = (a.x + b.x) / 2;
+    const d = `M ${a.x} ${a.y} C ${mid} ${a.y}, ${mid} ${b.y}, ${b.x} ${b.y}`;
+    const semantic = !["precedes","narrates","observed_during","sampled_during","temporally_associated_with"].includes(edge.type);
+    return `<path class="edge ${semantic ? "semantic" : "temporal"} ${state.selectedEdgeId === edge.id ? "edge-selected" : ""}" d="${d}" data-edge="${escapeHtml(edge.id)}"><title>${escapeHtml(relationLabels[edge.type] || edge.type)}</title></path>`;
+  }).join("");
+  const circles = nodes.map(node => {
+    const p = positions.get(node.id), meta = nodeType(node), selected = state.selectedId === node.id;
+    const title = escapeHtml(nodeTitle(node).slice(0, 25));
+    const label = title.length > 22 ? title.slice(0, 21) + "…" : title;
+    return `<g class="graph-node ${selected ? "node-selected" : ""}" transform="translate(${p.x},${p.y})" data-node="${escapeHtml(node.id)}" tabindex="0" role="button" aria-label="${title}">
+      <circle class="node-halo" r="26" fill="${meta.color}" opacity=".12"></circle><circle class="node-dot" r="17" fill="${meta.color}"></circle>
+      <text class="node-icon" text-anchor="middle" y="5">${meta.icon}</text>
+      <text class="node-label" text-anchor="middle" y="43">${label}</text>
+      <text class="node-type" text-anchor="middle" y="57">${meta.label.toUpperCase()}</text>
+    </g>`;
+  }).join("");
+  const laneLabels = ["CHARACTERS","PLACES","EVENTS","STORY BEATS","SHOTS","VISUAL EVIDENCE","VOICEOVER"];
+  const laneXs = [115,285,455,625,795,945,1060];
+  return `<svg class="graph-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Interactive story continuity graph">
+    <defs><pattern id="dots" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="1" fill="#ffffff" opacity=".08"/></pattern></defs>
+    <rect width="${width}" height="${height}" fill="url(#dots)"></rect>
+    ${laneXs.map((x,i)=>`<line class="lane-line" x1="${x}" y1="25" x2="${x}" y2="620"></line><text class="lane-label" x="${x}" y="18" text-anchor="middle">${laneLabels[i]}</text>`).join("")}
+    <g class="edge-layer">${paths}</g><g class="node-layer">${circles}</g>
+  </svg>`;
+}
+function renderOverviewInspector() {
+  const edges = state.graph.edges.slice(0, 5);
+  return `<div class="inspector-head"><span class="eyebrow">GRAPH INSPECTOR</span><span class="inspector-mark">✳</span></div><h3>Explore the connections</h3><p class="inspector-desc">Choose any node to see its details, timestamps and supporting evidence. Choose a line to inspect the relationship.</p>
+    <div class="inspector-divider"></div><div class="mini-heading">RELATIONSHIP TYPES</div><div class="relation-list">${Object.entries(relationLabels).filter(([k]) => state.graph.edges.some(e=>e.type===k)).map(([k,v])=>`<div><span>${escapeHtml(v)}</span><b>${state.graph.edges.filter(e=>e.type===k).length}</b></div>`).join("")}</div>
+    <div class="inspector-divider"></div><div class="mini-heading">RECENT CONNECTIONS</div>${edges.map(e=>`<button class="connection-row" data-inspect-edge="${escapeHtml(e.id)}"><span>${escapeHtml(nodeTitle(evidenceFor(e.source)) || e.source)}</span><i>→</i><span>${escapeHtml(nodeTitle(evidenceFor(e.target)) || e.target)}</span></button>`).join("") || '<p class="muted">No relationships available yet.</p>'}`;
+}
+function renderNodeInspector(node) {
+  const meta = nodeType(node);
+  const edges = state.graph.edges.filter(e => e.source === node.id || e.target === node.id);
+  const refs = [...new Set([...(node.evidence_refs || []), ...edges.flatMap(e => e.evidence_refs || [])])];
+  const evidenceNodes = refs.map(evidenceFor).filter(Boolean);
+  const start = node.start_seconds, end = node.end_seconds;
+  return `<div class="inspector-head"><span class="eyebrow">NODE DETAILS</span><button class="text-button" id="clear-selection">Clear ×</button></div>
+    <div class="entity-title"><span class="entity-icon" style="--entity:${meta.color}">${meta.icon}</span><div><span class="entity-type">${meta.label.toUpperCase()}</span><h3>${escapeHtml(nodeTitle(node))}</h3></div></div>
+    ${node.description ? `<p class="inspector-desc">${escapeHtml(node.description)}</p>` : ""}
+    ${start !== undefined ? `<div class="time-range"><span>TIME RANGE</span><strong>${fmtTime(start)} ${end !== undefined ? "— "+fmtTime(end) : ""}</strong></div>` : ""}
+    ${node.intent ? `<div class="intent-box"><span>STORY INTENT</span><p>${escapeHtml(node.intent)}</p></div>` : ""}
+    ${node.perceptual_hash ? `<div class="hash-row"><span>PERCEPTUAL HASH</span><code>${escapeHtml(node.perceptual_hash)}</code></div>` : ""}
+    <div class="inspector-divider"></div><div class="mini-heading">CONNECTED RELATIONSHIPS <b>${edges.length}</b></div>
+    <div class="connection-list">${edges.map(e=>{const other=e.source===node.id?e.target:e.source;const target=evidenceFor(other);return `<button class="connection-item" data-inspect-edge="${escapeHtml(e.id)}"><span class="connection-type">${escapeHtml(relationLabels[e.type]||e.type)}</span><strong>${escapeHtml(nodeTitle(target)||other)}</strong><small>${escapeHtml(e.verification_status||"Evidence-linked")}</small></button>`;}).join("") || '<p class="muted">No connected relationships.</p>'}</div>
+    <div class="inspector-divider"></div><div class="mini-heading">SUPPORTING EVIDENCE <b>${evidenceNodes.length}</b></div>
+    <div class="evidence-list">${evidenceNodes.map(e=>renderEvidenceCard(e)).join("") || '<p class="muted">No linked evidence nodes.</p>'}</div>
+    <div class="provenance"><span>PROVENANCE</span><small>${escapeHtml(node.evidence_status || "Graph node")}</small><code>${escapeHtml(node.id)}</code></div>`;
+}
+function renderEvidenceCard(node) {
+  const meta = nodeType(node);
+  return `<div class="evidence-card"><div class="evidence-card-top"><span class="evidence-kind" style="--entity:${meta.color}">${meta.icon} ${meta.label}</span><span class="evidence-time">${fmtTime(node.start_seconds)}${node.end_seconds !== undefined && node.end_seconds !== node.start_seconds ? " – "+fmtTime(node.end_seconds) : ""}</span></div><p>${escapeHtml(nodeTitle(node))}</p>${node.object_key ? `<small class="object-key">${escapeHtml(node.object_key)}</small>` : ""}<button class="evidence-select" data-select-node="${escapeHtml(node.id)}">Inspect evidence ↗</button></div>`;
+}
+function renderEdgeInspector() {
+  const edge = state.graph.edges.find(e=>e.id===state.selectedEdgeId);
+  if (!edge) return renderOverviewInspector();
+  const source=evidenceFor(edge.source), target=evidenceFor(edge.target);
+  const refs=(edge.evidence_refs||[]).map(evidenceFor).filter(Boolean);
+  return `<div class="inspector-head"><span class="eyebrow">RELATIONSHIP DETAILS</span><button class="text-button" id="clear-selection">Clear ×</button></div>
+    <div class="relation-hero"><span>LINK</span><h3>${escapeHtml(relationLabels[edge.type]||edge.type)}</h3></div>
+    <div class="relation-endpoints"><div><small>FROM</small><strong>${escapeHtml(nodeTitle(source)||edge.source)}</strong></div><i>→</i><div><small>TO</small><strong>${escapeHtml(nodeTitle(target)||edge.target)}</strong></div></div>
+    <div class="verification-state"><span class="verify-icon">${edge.verification_status?.includes("verified") ? "✓" : "◈"}</span><div><small>VERIFICATION STATUS</small><strong>${escapeHtml((edge.verification_status||"requires review").replaceAll("_"," "))}</strong></div></div>
+    ${edge.claim_quote ? `<blockquote class="claim-quote">“${escapeHtml(edge.claim_quote)}”<small>Narration claim · not independently verified</small></blockquote>` : ""}
+    <div class="inspector-divider"></div><div class="mini-heading">EVIDENCE REFERENCES <b>${refs.length}</b></div><div class="evidence-list">${refs.map(e=>renderEvidenceCard(e)).join("") || '<p class="muted">No resolvable evidence references.</p>'}</div>
+    <div class="provenance"><span>HUMAN REVIEW</span><small>${edge.requires_human_review ? "Required" : "Not required for timestamp relation"}</small><code>${escapeHtml(edge.id)}</code></div>`;
+}
+function bindShell() {
+  $("#load-form")?.addEventListener("submit", async e => {
+    e.preventDefault();
+    state.projectId=$("#project-input").value.trim();
+    state.jobId=$("#job-input").value.trim();
+    await loadGraph();
+  });
+  $("#settings-btn")?.addEventListener("click",()=>$("#settings-modal").classList.remove("hidden"));
+  $("#close-settings")?.addEventListener("click",()=>$("#settings-modal").classList.add("hidden"));
+  $("#settings-modal")?.addEventListener("click",e=>{if(e.target.id==="settings-modal") e.currentTarget.classList.add("hidden");});
+  $("#save-settings")?.addEventListener("click",()=>{
+    state.apiBase=$("#api-base-input").value.trim().replace(/\/$/,"");
+    localStorage.setItem("editflow-api-base",state.apiBase);
+    $("#settings-modal").classList.add("hidden");
+  });
+}
+async function loadGraph() {
+  state.loading=true; state.error=""; render();
+  try {
+    const base=state.apiBase.replace(/\/$/,"");
+    const url=`${base}/v1/projects/${encodeURIComponent(state.projectId)}/renders/${encodeURIComponent(state.jobId)}/story-continuity`;
+    const response=await fetch(url,{headers:{Accept:"application/json"}});
+    const body=await response.json().catch(()=>({}));
+    if(!response.ok) throw new Error(body.detail || `Request failed (${response.status})`);
+    const graph=body.graph;
+    if(!graph || !Array.isArray(graph.nodes) || !Array.isArray(graph.edges)) throw new Error("The API response does not contain a valid graph.");
+    state.graph=graph; state.selectedId=null; state.selectedEdgeId=null; state.search=""; state.filter="all";
+  } catch(error) {
+    state.error=error.message || "Could not load the Story Continuity Graph.";
+  } finally {
+    state.loading=false; render();
+  }
+}
+function bindExplorer() {
+  $("#graph-search")?.addEventListener("input",e=>{state.search=e.target.value;const pos=e.target.selectionStart;render();const input=$("#graph-search");input.focus();input.setSelectionRange(pos,pos);});
+  $$("[data-filter]").forEach(btn=>btn.addEventListener("click",()=>{state.filter=btn.dataset.filter;state.selectedId=null;state.selectedEdgeId=null;render();}));
+  $$("[data-node]").forEach(el=>{
+    const select=()=>{state.selectedId=el.dataset.node;state.selectedEdgeId=null;render();};
+    el.addEventListener("click",select);
+    el.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();select();}});
+  });
+  $$("[data-edge]").forEach(el=>el.addEventListener("click",()=>{state.selectedEdgeId=el.dataset.edge;state.selectedId=null;render();}));
+  $$("[data-inspect-edge]").forEach(el=>el.addEventListener("click",()=>{state.selectedEdgeId=el.dataset.inspectEdge;state.selectedId=null;render();}));
+  $$("[data-select-node]").forEach(el=>el.addEventListener("click",()=>{state.selectedId=el.dataset.selectNode;state.selectedEdgeId=null;render();}));
+  $("#clear-selection")?.addEventListener("click",()=>{state.selectedId=null;state.selectedEdgeId=null;render();});
+  $("#zoom-in")?.addEventListener("click",()=>scaleGraph(1.15));
+  $("#zoom-out")?.addEventListener("click",()=>scaleGraph(.87));
+  $("#fit-graph")?.addEventListener("click",()=>{state.zoom=1;applyZoom();});
+  applyZoom();
+}
+function scaleGraph(factor) { state.zoom=Math.max(.65,Math.min(1.8,state.zoom*factor));applyZoom(); }
+function applyZoom() {
+  const svg=$(".graph-svg");
+  if(svg) svg.style.transform=`scale(${state.zoom})`;
+}
+render();
