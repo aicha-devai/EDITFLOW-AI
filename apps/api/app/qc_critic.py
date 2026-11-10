@@ -159,11 +159,18 @@ def _temporal_evidence(
             "title": str(beat.get("title") or "Untitled story beat")[:160],
         })
 
+    transcription = bundle.get("transcription", {})
+    audio_artifact = bundle.get("audio_artifact")
     return {
         "transcript_segments": transcript,
         "keyframes": keyframes,
         "observations": observations,
         "story_beats": beats,
+        "extraction_status": bundle.get("extraction_status", "not_available"),
+        "transcription_status": transcription.get("status", "not_available") if isinstance(transcription, dict) else "not_available",
+        "transcription_provider": transcription.get("provider") if isinstance(transcription, dict) else None,
+        "visual_semantics_status": bundle.get("visual_semantics_status", "not_available"),
+        "audio_artifact": audio_artifact if isinstance(audio_artifact, dict) else None,
         "available_modalities": sorted(
             (["transcript"] if transcript else [])
             + (["visual"] if any(x["modality"] == "visual" for x in observations) else [])
