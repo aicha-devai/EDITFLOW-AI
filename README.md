@@ -50,3 +50,33 @@ For a local development asset, place the media file at the path represented by i
 `renders/{project_id}/{job_id}.mp4`
 
 This first worker adapter uses local filesystem storage. It is not yet an S3-compatible production storage integration. See [Render Pipeline documentation](docs/engineering/RENDER_PIPELINE.md) for supported timeline features and current limitations.
+
+
+## Story Graph Explorer
+
+A browser-based interactive graph viewer lives in `apps/web`. It reads the evidence graph persisted by a successful Render Job; it does not mutate the pinned Timeline.
+
+Start the API and database:
+
+```bash
+docker compose up --build
+```
+
+In another terminal, start the explorer:
+
+```bash
+cd apps/web
+npm install
+npm run dev
+```
+
+Open the Vite URL (normally `http://localhost:5173`), enter the Project UUID and successful Render Job UUID, then choose **Load graph**. The API base URL defaults to `http://localhost:8000` and can be changed from the settings control.
+
+The explorer supports:
+- Interactive selection of graph nodes and relationship edges.
+- Entity-type filters and text search.
+- A detail inspector with connected relationships, provenance, timestamps and linked evidence.
+- Relationship verification labels and explicit narration-claim warnings for causal edges.
+- Graph zoom controls and responsive layout.
+
+For non-local hosting, set `EDITFLOW_CORS_ORIGINS` to a comma-separated allowlist of the exact browser origins hosting the explorer. Do not use a wildcard for a credentialed or public deployment. The current API does not implement workspace authentication; keep it on a trusted development network until authorization is added.
