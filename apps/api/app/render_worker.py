@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.evidence_extraction import EvidenceExtractionError, extract_render_evidence
+from app.story_analysis import analyze_story_sequence
 from app.media_probe import probe_media
 from app.models import Asset, RenderJob
 from app.render_engine import build_ffmpeg_plan
@@ -152,6 +153,13 @@ async def render_claimed_job(
                     audio_artifact["object_key"] = audio_key
                     audio_artifact.pop("filename", None)
                 quality_report["evidence"] = evidence
+                quality_report["story_analysis"] = await analyze_story_sequence(
+                    snapshot, evidence,
+                    api_key=settings.evidence_vision_api_key,
+                    endpoint=settings.evidence_vision_endpoint,
+                    model=settings.evidence_vision_model,
+                    timeout_seconds=min(timeout_seconds, settings.evidence_extraction_timeout_seconds),
+                )
             except EvidenceExtractionError as exc:
                 quality_report["evidence"] = {
                     "schema_version": "1.0", "extraction_status": "failed",
