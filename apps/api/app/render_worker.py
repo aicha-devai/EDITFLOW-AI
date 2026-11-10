@@ -131,6 +131,9 @@ async def render_claimed_job(
                     asr_api_key=settings.evidence_asr_api_key,
                     asr_endpoint=settings.evidence_asr_endpoint,
                     asr_model=settings.evidence_asr_model,
+                    vision_api_key=settings.evidence_vision_api_key,
+                    vision_endpoint=settings.evidence_vision_endpoint,
+                    vision_model=settings.evidence_vision_model,
                     timeout_seconds=min(timeout_seconds, settings.evidence_extraction_timeout_seconds),
                 )
                 _attach_signal_observations(evidence, quality_report.get("findings", []))
