@@ -298,7 +298,11 @@ function renderGraphSvg(nodes) {
     const mid = (a.x + b.x) / 2;
     const d = `M ${a.x} ${a.y} C ${mid} ${a.y}, ${mid} ${b.y}, ${b.x} ${b.y}`;
     const semantic = !["precedes","narrates","observed_during","sampled_during","temporally_associated_with"].includes(edge.type);
-    return `<path class="edge ${semantic ? "semantic" : "temporal"} ${state.selectedEdgeId === edge.id ? "edge-selected" : ""}" d="${d}" data-edge="${escapeHtml(edge.id)}"><title>${escapeHtml(relationLabels[edge.type] || edge.type)}</title></path>`;
+    const label = relationLabels[edge.type] || edge.type;
+    return `<g class="edge-control" data-edge="${escapeHtml(edge.id)}" tabindex="0" role="button" aria-label="Inspect relationship: ${escapeHtml(label)}">
+      <path class="edge-hit" d="${d}"></path>
+      <path class="edge ${semantic ? "semantic" : "temporal"} ${state.selectedEdgeId === edge.id ? "edge-selected" : ""}" d="${d}" aria-hidden="true"><title>${escapeHtml(label)}</title></path>
+    </g>`;
   }).join("");
   const circles = nodes.map(node => {
     const p = positions.get(node.id), meta = nodeType(node), selected = state.selectedId === node.id;
@@ -402,8 +406,24 @@ function bindExplorer() {
     el.addEventListener("click",select);
     el.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();select();}});
   });
-  $$("[data-edge]").forEach(el=>el.addEventListener("click",()=>{const edge=state.graph.edges.find(x=>x.id===el.dataset.edge);state.selectedEdgeId=el.dataset.edge;state.selectedId=null;render();const ref=(edge?.evidence_refs||[]).map(evidenceFor).filter(Boolean).sort((a,b)=>(a.start_seconds??Infinity)-(b.start_seconds??Infinity))[0];if(ref && hasTimestamp(ref.start_seconds))seekToTimestamp(ref.start_seconds);}));
-  $$("[data-inspect-edge]").forEach(el=>el.addEventListener("click",()=>{const edge=state.graph.edges.find(x=>x.id===el.dataset.inspectEdge);state.selectedEdgeId=el.dataset.inspectEdge;state.selectedId=null;render();const ref=(edge?.evidence_refs||[]).map(evidenceFor).filter(Boolean).sort((a,b)=>(a.start_seconds??Infinity)-(b.start_seconds??Infinity))[0];if(ref && Number.isFinite(Number(ref.start_seconds)))seekToTimestamp(ref.start_seconds);}));
+  $("[data-edge]").forEach(el=>{
+    const inspect=()=>{
+      const edge=state.graph.edges.find(x=>x.id===el.dataset.edge);
+      state.selectedEdgeId=el.dataset.edge;state.selectedId=null;render();
+      const ref=(edge?.evidence_refs||[]).map(evidenceFor).filter(Boolean)
+        .sort((a,b)=>(hasTimestamp(a.start_seconds)?Number(a.start_seconds):Infinity)-(hasTimestamp(b.start_seconds)?Number(b.start_seconds):Infinity))[0];
+      if(ref && hasTimestamp(ref.start_seconds)) seekToTimestamp(ref.start_seconds);
+    };
+    el.addEventListener("click",inspect);
+    el.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();inspect();}});
+  });
+  $("[data-inspect-edge]").forEach(el=>el.addEventListener("click",()=>{
+    const edge=state.graph.edges.find(x=>x.id===el.dataset.inspectEdge);
+    state.selectedEdgeId=el.dataset.inspectEdge;state.selectedId=null;render();
+    const ref=(edge?.evidence_refs||[]).map(evidenceFor).filter(Boolean)
+      .sort((a,b)=>(hasTimestamp(a.start_seconds)?Number(a.start_seconds):Infinity)-(hasTimestamp(b.start_seconds)?Number(b.start_seconds):Infinity))[0];
+    if(ref && hasTimestamp(ref.start_seconds)) seekToTimestamp(ref.start_seconds);
+  }));
   $$("[data-select-node]").forEach(el=>el.addEventListener("click",()=>{const node=evidenceFor(el.dataset.selectNode);state.selectedId=el.dataset.selectNode;state.selectedEdgeId=null;render();if(node && hasTimestamp(node.start_seconds))seekToTimestamp(node.start_seconds);}));
   $$("[data-evidence-node]").forEach(el=>el.addEventListener("click",()=>{
     const node=evidenceFor(el.dataset.evidenceNode);
