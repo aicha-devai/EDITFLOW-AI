@@ -91,3 +91,6 @@ After loading a successful Render Job, the Explorer requests the immutable rende
 Local storage is streamed through a range-capable API response; S3 storage uses a short-lived presigned redirect. The player uses browser-native seeking and HTTP byte ranges, so clicking a timestamped shot, narration segment, visual observation, story beat, or evidence card jumps to that point in the rendered video. Entity and relationship selections jump to their earliest resolvable evidence timestamp when one exists.
 
 The player does not expose raw storage object keys as public URLs and does not modify the Render Job or Timeline.
+
+
+The Explorer also shows a horizontally scrollable, timestamp-sorted evidence strip (up to 160 markers). Selecting a marker selects its exact graph node and seeks the player. During playback, the current timestamped evidence is highlighted in both the strip and graph, and the player status identifies the active evidence item. This is a time-overlap cue, not a claim that the evidence semantically verifies the video content.
