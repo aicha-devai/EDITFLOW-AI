@@ -4,8 +4,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.db import get_db
 from app.rendering import create_render_job, get_render_job, request_render_cancellation, RenderJobNotFound
-from app.models import Project
-from app.schemas import ProjectCreate, SaveTimelineRequest, RestoreRequest, CreateRenderRequest
+from sqlalchemy import select
+from app.models import Project, RenderJob
+from app.schemas import (
+    ProjectCreate, SaveTimelineRequest, RestoreRequest, CreateRenderRequest,
+    QCCriticApprovalRequest,
+)
+from app.qc_critic import (
+    generate_qc_critic_proposals, approve_qc_intent_proposals,
+    QCCriticNotFound, QCCriticNotReady, StaleQCCriticBase,
+)
 from app.versioning import (
     save_timeline, list_versions, compare_versions, restore_version,
     VersionConflict, ProjectNotFound,
