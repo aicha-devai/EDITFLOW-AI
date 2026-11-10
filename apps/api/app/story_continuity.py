@@ -111,6 +111,7 @@ def _validate_model_graph(payload: dict, sources: dict[str, dict]) -> tuple[list
     edges: list[dict] = []
     rejected: list[str] = []
     entity_ids: dict[str, str] = {}
+    entity_types: dict[str, str] = {}
 
     for item in payload.get("entities", [])[:100] if isinstance(payload.get("entities"), list) else []:
         if not isinstance(item, dict):
@@ -124,6 +125,7 @@ def _validate_model_graph(payload: dict, sources: dict[str, dict]) -> tuple[list
         canonical = re.sub(r"\s+", " ", name).strip().casefold()
         node_id = _stable_id("entity", f"{kind}:{canonical}")
         entity_ids[str(item.get("id", ""))] = node_id
+        entity_types[str(item.get("id", ""))] = kind
         if not any(node["id"] == node_id for node in nodes):
             nodes.append({"id": node_id, "type": kind, "label": name.strip()[:120],
                           "description": str(item.get("description") or "")[:300],
@@ -141,6 +143,9 @@ def _validate_model_graph(payload: dict, sources: dict[str, dict]) -> tuple[list
             rejected.append("relationship_missing_valid_endpoints_type_or_evidence")
             continue
         if relation == "causes":
+            if entity_types.get(str(item.get("source_id", ""))) != "event" or entity_types.get(str(item.get("target_id", ""))) != "event":
+                rejected.append("causal_edge_rejected_unless_both_endpoints_are_events")
+                continue
             quote = item.get("claim_quote")
             grounded_sources = [sources[ref] for ref in refs]
             if not any(_causal_quote_is_grounded(quote, source) for source in grounded_sources):
