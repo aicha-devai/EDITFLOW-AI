@@ -221,3 +221,26 @@ def test_critic_does_not_claim_multimodal_evidence_when_none_was_supplied():
         "audio_artifact": None,
         "available_modalities": [],
     }
+
+
+def test_qc_critic_exposes_story_sequence_review_without_auto_changes():
+    result = generate_qc_critic_proposals(
+        {"findings": [], "story_analysis": {
+            "status": "completed", "analysis_status": "completed",
+            "analysis_model": "test-model",
+            "findings": [{
+                "code": "possible_narration_visual_mismatch",
+                "start_seconds": 4, "end_seconds": 7,
+                "summary": "Narration describes a photograph while the visual evidence shows a corridor.",
+                "evidence_refs": ["b2", "transcript:4.2-5.1", "visual:5.0-6.0"],
+            }],
+        }},
+        {},
+    )
+    review = result["story_review"]
+    assert review["analysis_status"] == "completed"
+    assert review["analysis_model"] == "test-model"
+    assert review["findings"][0]["code"] == "possible_narration_visual_mismatch"
+    assert review["requires_human_review"] is True
+    assert review["automatic_changes"] == 0
+    assert result["automatic_changes"] == 0
