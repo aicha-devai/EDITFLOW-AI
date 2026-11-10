@@ -8,6 +8,8 @@ is configured.
 from __future__ import annotations
 
 import asyncio
+import base64
+import json
 import re
 from pathlib import Path
 from typing import Any
@@ -172,11 +174,91 @@ async def transcribe_with_whisper(
     }
 
 
+async def analyze_keyframes_with_vision(
+    frames: list[dict[str, Any]], frames_dir: str | Path, *,
+    api_key: str | None,
+    endpoint: str = "https://api.openai.com/v1/chat/completions",
+    model: str = "gpt-4o-mini",
+    timeout_seconds: int = 900,
+    batch_size: int = 6,
+) -> dict[str, Any]:
+    """Generate timestamped, image-grounded descriptions when a vision key is configured."""
+    if not api_key:
+        return {"status": "not_configured", "provider": None, "model": None, "observations": []}
+    if not 1 <= batch_size <= 8:
+        raise ValueError("vision batch_size must be between 1 and 8")
+    root = Path(frames_dir)
+    observations: list[dict[str, Any]] = []
+    try:
+        async with httpx.AsyncClient(timeout=timeout_seconds) as client:
+            for offset in range(0, len(frames), batch_size):
+                batch = frames[offset:offset + batch_size]
+                content_parts: list[dict[str, Any]] = [{
+                    "type": "text",
+                    "text": (
+                        "Describe only directly visible content in each numbered frame. "
+                        "Do not infer intent, hidden events, identities, or causes. "
+                        "Return JSON only: {\\"frames\\":[{\\"frame_id\\":string,\\"description\\":string}]}. "
+                        "Keep each description factual and under 45 words."
+                    ),
+                }]
+                for index, frame in enumerate(batch):
+                    frame_path = root / frame["filename"]
+                    encoded = base64.b64encode(frame_path.read_bytes()).decode("ascii")
+                    content_parts.append({
+                        "type": "text",
+                        "text": f"frame_id={index} timestamp_seconds={frame['timestamp_seconds']}",
+                    })
+                    content_parts.append({
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/jpeg;base64,{encoded}", "detail": "low"},
+                    })
+                response = await client.post(
+                    endpoint,
+                    headers={"Authorization": f"Bearer {api_key}"},
+                    json={
+                        "model": model,
+                        "temperature": 0,
+                        "response_format": {"type": "json_object"},
+                        "messages": [{"role": "user", "content": content_parts}],
+                    },
+                )
+                response.raise_for_status()
+                payload = response.json()
+                raw = payload["choices"][0]["message"]["content"]
+                parsed = json.loads(raw)
+                by_id = {
+                    str(item.get("frame_id")): item.get("description")
+                    for item in parsed.get("frames", []) if isinstance(item, dict)
+                }
+                for index, frame in enumerate(batch):
+                    description = by_id.get(str(index))
+                    if isinstance(description, str) and description.strip():
+                        observations.append({
+                            "start_seconds": float(frame["timestamp_seconds"]),
+                            "end_seconds": float(frame["end_seconds"]),
+                            "description": description.strip()[:500],
+                            "source": "openai_vision",
+                            "model": model,
+                        })
+    except (httpx.HTTPError, KeyError, TypeError, ValueError, OSError) as exc:
+        return {
+            "status": "failed", "provider": "openai_compatible_vision",
+            "model": model, "observations": observations, "message": str(exc)[:500],
+        }
+    return {
+        "status": "completed", "provider": "openai_compatible_vision",
+        "model": model, "observations": observations,
+    }
+
+
 async def extract_render_evidence(
     video_path: str, work_dir: str | Path, *, duration_seconds: float,
     includes_audio: bool, asr_api_key: str | None = None,
     asr_endpoint: str = "https://api.openai.com/v1/audio/transcriptions",
-    asr_model: str = "whisper-1", timeout_seconds: int = 900,
+    asr_model: str = "whisper-1", vision_api_key: str | None = None,
+    vision_endpoint: str = "https://api.openai.com/v1/chat/completions",
+    vision_model: str = "gpt-4o-mini", timeout_seconds: int = 900,
 ) -> dict[str, Any]:
     root = Path(work_dir)
     frames = await extract_representative_keyframes(
@@ -191,6 +273,16 @@ async def extract_render_evidence(
                           "provider": None, "segments": []},
         "visual_semantics_status": "not_configured",
     }
+    vision = await analyze_keyframes_with_vision(
+        frames, root / "frames", api_key=vision_api_key,
+        endpoint=vision_endpoint, model=vision_model, timeout_seconds=timeout_seconds,
+    )
+    evidence["visual_analysis"] = {
+        "status": vision["status"], "provider": vision.get("provider"),
+        "model": vision.get("model"), "message": vision.get("message"),
+    }
+    evidence["visual_semantics_status"] = vision["status"]
+    evidence["visual_observations"] = vision.get("observations", [])
     if includes_audio:
         audio = await extract_audio_track(video_path, root / "audio.mp3", timeout_seconds)
         transcription = await transcribe_with_whisper(
