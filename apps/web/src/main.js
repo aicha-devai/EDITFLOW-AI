@@ -344,7 +344,7 @@ function renderNodeInspector(node) {
 }
 function renderEvidenceCard(node) {
   const meta = nodeType(node);
-  return `<div class="evidence-card"><div class="evidence-card-top"><span class="evidence-kind" style="--entity:${meta.color}">${meta.icon} ${meta.label}</span><span class="evidence-time">${fmtTime(node.start_seconds)}${node.end_seconds !== undefined && node.end_seconds !== node.start_seconds ? " – "+fmtTime(node.end_seconds) : ""}</span></div><p>${escapeHtml(nodeTitle(node))}</p>${node.object_key ? `<small class="object-key">${escapeHtml(node.object_key)}</small>` : ""}<div class="evidence-actions"><button class="evidence-select" data-select-node="${escapeHtml(node.id)}">Inspect evidence</button>${Number.isFinite(Number(node.start_seconds)) ? `<button class="evidence-jump" data-jump-time="${Number(node.start_seconds)}">▶ Jump to ${fmtTime(node.start_seconds)}</button>` : ""}</div></div>`;
+  return `<div class="evidence-card"><div class="evidence-card-top"><span class="evidence-kind" style="--entity:${meta.color}">${meta.icon} ${meta.label}</span><span class="evidence-time">${fmtTime(node.start_seconds)}${node.end_seconds !== undefined && node.end_seconds !== node.start_seconds ? " – "+fmtTime(node.end_seconds) : ""}</span></div><p>${escapeHtml(nodeTitle(node))}</p>${node.object_key ? `<small class="object-key">${escapeHtml(node.object_key)}</small>` : ""}<div class="evidence-actions"><button class="evidence-select" data-select-node="${escapeHtml(node.id)}">Inspect evidence</button>${hasTimestamp(node.start_seconds) ? `<button class="evidence-jump" data-jump-time="${Number(node.start_seconds)}">▶ Jump to ${fmtTime(node.start_seconds)}</button>` : ""}</div></div>`;
 }
 function renderEdgeInspector() {
   const edge = state.graph.edges.find(e=>e.id===state.selectedEdgeId);
@@ -396,13 +396,13 @@ function bindExplorer() {
   $("#graph-search")?.addEventListener("input",e=>{state.search=e.target.value;const pos=e.target.selectionStart;render();const input=$("#graph-search");input.focus();input.setSelectionRange(pos,pos);});
   $$("[data-filter]").forEach(btn=>btn.addEventListener("click",()=>{state.filter=btn.dataset.filter;state.selectedId=null;state.selectedEdgeId=null;render();}));
   $$("[data-node]").forEach(el=>{
-    const select=()=>{const node=evidenceFor(el.dataset.node);state.selectedId=el.dataset.node;state.selectedEdgeId=null;render();if(node && Number.isFinite(Number(node.start_seconds)))seekToTimestamp(node.start_seconds);};
+    const select=()=>{const node=evidenceFor(el.dataset.node);state.selectedId=el.dataset.node;state.selectedEdgeId=null;render();if(node && hasTimestamp(node.start_seconds))seekToTimestamp(node.start_seconds);};
     el.addEventListener("click",select);
     el.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();select();}});
   });
   $$("[data-edge]").forEach(el=>el.addEventListener("click",()=>{const edge=state.graph.edges.find(x=>x.id===el.dataset.edge);state.selectedEdgeId=el.dataset.edge;state.selectedId=null;render();const ref=(edge?.evidence_refs||[]).map(evidenceFor).filter(Boolean).sort((a,b)=>(a.start_seconds??Infinity)-(b.start_seconds??Infinity))[0];if(ref && hasTimestamp(ref.start_seconds))seekToTimestamp(ref.start_seconds);}));
   $$("[data-inspect-edge]").forEach(el=>el.addEventListener("click",()=>{const edge=state.graph.edges.find(x=>x.id===el.dataset.inspectEdge);state.selectedEdgeId=el.dataset.inspectEdge;state.selectedId=null;render();const ref=(edge?.evidence_refs||[]).map(evidenceFor).filter(Boolean).sort((a,b)=>(a.start_seconds??Infinity)-(b.start_seconds??Infinity))[0];if(ref && Number.isFinite(Number(ref.start_seconds)))seekToTimestamp(ref.start_seconds);}));
-  $$("[data-select-node]").forEach(el=>el.addEventListener("click",()=>{const node=evidenceFor(el.dataset.selectNode);state.selectedId=el.dataset.selectNode;state.selectedEdgeId=null;render();if(node && Number.isFinite(Number(node.start_seconds)))seekToTimestamp(node.start_seconds);}));
+  $$("[data-select-node]").forEach(el=>el.addEventListener("click",()=>{const node=evidenceFor(el.dataset.selectNode);state.selectedId=el.dataset.selectNode;state.selectedEdgeId=null;render();if(node && hasTimestamp(node.start_seconds))seekToTimestamp(node.start_seconds);}));
   $$("[data-evidence-node]").forEach(el=>el.addEventListener("click",()=>{
     const node=evidenceFor(el.dataset.evidenceNode);
     if(node){state.selectedId=node.id;state.selectedEdgeId=null;render();}
