@@ -18,6 +18,12 @@ class Settings(BaseSettings):
         validation_alias="EDITFLOW_ASR_ENDPOINT",
     )
     evidence_asr_model: str = Field(default="whisper-1", validation_alias="EDITFLOW_ASR_MODEL")
+    evidence_vision_api_key: str | None = Field(default=None, validation_alias="EDITFLOW_VISION_API_KEY")
+    evidence_vision_endpoint: str = Field(
+        default="https://api.openai.com/v1/chat/completions",
+        validation_alias="EDITFLOW_VISION_ENDPOINT",
+    )
+    evidence_vision_model: str = Field(default="gpt-4o-mini", validation_alias="EDITFLOW_VISION_MODEL")
     evidence_extraction_timeout_seconds: int = Field(
         default=900, ge=30, le=3600, validation_alias="EDITFLOW_EVIDENCE_TIMEOUT_SECONDS"
     )
