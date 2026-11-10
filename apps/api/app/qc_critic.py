@@ -266,10 +266,28 @@ def generate_qc_critic_proposals(
             "requires_user_approval": True,
         })
 
+    story_analysis = quality_report.get("story_analysis", {})
+    if not isinstance(story_analysis, dict):
+        story_analysis = {}
+    story_findings = [
+        item for item in story_analysis.get("findings", [])
+        if isinstance(item, dict)
+    ] + [
+        item for item in story_analysis.get("semantic_findings", [])
+        if isinstance(item, dict)
+    ]
     return {
         "status": "proposals" if proposals else "no_actionable_findings",
         "engine": "deterministic_context_critic_v1",
         "proposals": proposals,
+        "story_review": {
+            "status": story_analysis.get("status", "not_available"),
+            "analysis_status": story_analysis.get("analysis_status", "not_available"),
+            "analysis_model": story_analysis.get("analysis_model"),
+            "findings": story_findings,
+            "requires_human_review": bool(story_findings),
+            "automatic_changes": 0,
+        },
         "automatic_changes": 0,
     }
 
