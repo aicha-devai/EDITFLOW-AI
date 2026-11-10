@@ -26,3 +26,17 @@ def test_local_storage_rejects_missing_object(tmp_path):
     storage = LocalObjectStorage(tmp_path / "objects")
     with pytest.raises(StorageError, match="does not exist"):
         storage.materialize("missing.mp4", tmp_path / "out.mp4")
+
+
+def test_local_storage_resolves_only_validated_existing_object_paths(tmp_path):
+    storage = LocalObjectStorage(tmp_path / "objects")
+    source = tmp_path / "render.mp4"
+    source.write_bytes(b"video-data")
+    storage.put_file(source, "renders/project/job.mp4")
+
+    resolved = storage.resolve_path("renders/project/job.mp4")
+    assert resolved.is_file()
+    assert resolved.read_bytes() == b"video-data"
+
+    with pytest.raises(StorageError):
+        storage.resolve_path("../outside.mp4")
