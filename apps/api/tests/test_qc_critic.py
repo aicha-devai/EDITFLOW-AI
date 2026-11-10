@@ -244,3 +244,20 @@ def test_qc_critic_exposes_story_sequence_review_without_auto_changes():
     assert review["requires_human_review"] is True
     assert review["automatic_changes"] == 0
     assert result["automatic_changes"] == 0
+
+
+def test_qc_critic_exposes_story_continuity_graph_without_automatic_changes():
+    graph = {
+        "status": "completed",
+        "nodes": [{"id": "entity:abc", "type": "character", "label": "A person"}],
+        "edges": [{"id": "edge:abc", "source": "entity:abc", "target": "shot:0",
+                   "type": "evidenced_by", "evidence_refs": ["shot:0"]}],
+        "entity_extraction_status": "completed",
+    }
+    result = generate_qc_critic_proposals(
+        {"findings": [], "story_continuity_graph": graph},
+        {},
+    )
+    assert result["story_review"]["continuity_graph"] == graph
+    assert result["story_review"]["requires_human_review"] is True
+    assert result["story_review"]["automatic_changes"] == 0
