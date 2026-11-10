@@ -172,8 +172,22 @@ async def build_story_continuity_graph(
 ) -> dict[str, Any]:
     """Build a timestamped graph; semantic entities require configured model evidence review."""
     segments = (story_analysis or {}).get("segments", [])
-    if not isinstance(segments, list):
+    if not isinstance(segments, list) or not segments:
         segments = []
+        sequence = timeline_snapshot.get("sequence") or {}
+        declared = sequence.get("story_beats", []) if isinstance(sequence, dict) else []
+        for index, beat in enumerate(declared):
+            if not isinstance(beat, dict):
+                continue
+            start = _time(beat.get("start_seconds", beat.get("timeline_start")))
+            end = _time(beat.get("end_seconds", beat.get("timeline_end")))
+            if start is not None and end is not None and end > start:
+                segments.append({
+                    "id": str(beat.get("id", index)),
+                    "title": str(beat.get("title") or f"Story beat {index + 1}")[:160],
+                    "start_seconds": start, "end_seconds": end,
+                    "intent": str(beat.get("intent") or beat.get("description") or "")[:500],
+                })
     nodes, sources = _evidence_nodes(evidence, segments)
     node_ids = {item["id"] for item in nodes}
     edges: list[dict] = []
@@ -194,8 +208,12 @@ async def build_story_continuity_graph(
     # Link evidence to every beat it overlaps; this is temporal alignment, not semantic agreement.
     for beat in beats:
         for source_id, source in sources.items():
-            if _overlaps(beat["start_seconds"], beat["end_seconds"],
-                         source["start_seconds"], source["end_seconds"]):
+            point_shot = source["kind"] == "shot" and source["start_seconds"] == source["end_seconds"]
+            overlaps = (beat["start_seconds"] <= source["start_seconds"] < beat["end_seconds"]
+                        if point_shot else _overlaps(
+                            beat["start_seconds"], beat["end_seconds"],
+                            source["start_seconds"], source["end_seconds"]))
+            if overlaps:
                 kind = source["kind"]
                 relation = {"transcript": "narrates", "visual": "observed_during", "shot": "sampled_during"}[kind]
                 edges.append({
@@ -260,6 +278,32 @@ async def build_story_continuity_graph(
         entity_nodes, semantic_edges, rejected = _validate_model_graph(parsed, sources)
         graph["nodes"].extend(entity_nodes)
         graph["edges"].extend(semantic_edges)
+        # Explicitly connect extracted entities to the exact evidence nodes that support them.
+        for entity in entity_nodes:
+            for ref in entity["evidence_refs"]:
+                graph["edges"].append({
+                    "id": _stable_id("edge", f"{entity['id']}|evidenced_by|{ref}"),
+                    "source": entity["id"], "target": ref, "type": "evidenced_by",
+                    "evidence_refs": [ref],
+                    "verification_status": "grounded_in_timestamped_source",
+                    "requires_human_review": True,
+                })
+                source = sources.get(ref)
+                if source:
+                    for beat in beats:
+                        point_shot = source["kind"] == "shot" and source["start_seconds"] == source["end_seconds"]
+                        overlaps = (beat["start_seconds"] <= source["start_seconds"] < beat["end_seconds"]
+                                    if point_shot else _overlaps(
+                                        beat["start_seconds"], beat["end_seconds"],
+                                        source["start_seconds"], source["end_seconds"]))
+                        if overlaps:
+                            graph["edges"].append({
+                                "id": _stable_id("edge", f"{entity['id']}|present_during|{beat['id']}|{ref}"),
+                                "source": entity["id"], "target": beat["id"], "type": "present_during",
+                                "evidence_refs": [ref, beat["id"]],
+                                "verification_status": "timestamp_overlap_plus_model_entity_link",
+                                "requires_human_review": True,
+                            })
         graph["rejected_model_items"] = rejected[:100]
         graph["entity_extraction_status"] = "completed"
         graph["entity_extraction_model"] = model
