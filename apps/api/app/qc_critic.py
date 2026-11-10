@@ -103,7 +103,7 @@ def generate_qc_critic_proposals(
             ("editorial_or_story_notes", global_context),
         ):
             joined = " ".join(values).casefold()
-            cues = [cue for cue in _INTENT_CUES[kind] if re.search(r"(?<!\\w)" + re.escape(cue) + r"(?!\\w)", joined)]
+            cues = [cue for cue in _INTENT_CUES[kind] if re.search(r"(?<!\w)" + re.escape(cue) + r"(?!\w)", joined)]
             if cues:
                 matched_cues.extend(cues)
                 matched_sources.append(source_name)
