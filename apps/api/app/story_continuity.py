@@ -119,7 +119,9 @@ def _validate_model_graph(payload: dict, sources: dict[str, dict]) -> tuple[list
         kind, name = item.get("type"), item.get("name")
         refs = item.get("evidence_refs")
         refs = [ref for ref in refs if isinstance(ref, str) and ref in sources] if isinstance(refs, list) else []
-        if kind not in _ALLOWED_ENTITY_TYPES or not isinstance(name, str) or not name.strip() or not refs:
+        model_id = item.get("id")
+        if (kind not in _ALLOWED_ENTITY_TYPES or not isinstance(name, str) or not name.strip()
+                or not isinstance(model_id, str) or not model_id.strip() or not refs):
             rejected.append("entity_missing_type_name_or_grounded_evidence")
             continue
         canonical = re.sub(r"\s+", " ", name).strip().casefold()
@@ -193,6 +195,19 @@ async def build_story_continuity_graph(
                     "start_seconds": start, "end_seconds": end,
                     "intent": str(beat.get("intent") or beat.get("description") or "")[:500],
                 })
+        if not segments:
+            for index, clip in enumerate(timeline_snapshot.get("clips", [])):
+                if not isinstance(clip, dict):
+                    continue
+                start = _time(clip.get("timeline_start"))
+                source_in, source_out = _time(clip.get("source_in")), _time(clip.get("source_out"))
+                if start is not None and source_in is not None and source_out is not None and source_out > source_in:
+                    segments.append({
+                        "id": str(clip.get("story_beat_id") or clip.get("id") or index),
+                        "title": str(clip.get("rationale") or f"Clip {index + 1}")[:160],
+                        "start_seconds": start, "end_seconds": round(start + source_out - source_in, 3),
+                        "intent": str(clip.get("rationale") or "")[:500],
+                    })
     nodes, sources = _evidence_nodes(evidence, segments)
     node_ids = {item["id"] for item in nodes}
     edges: list[dict] = []
