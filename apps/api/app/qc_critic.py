@@ -101,6 +101,22 @@ def _temporal_evidence(
                 "source": "render_evidence.transcript_segments",
             })
 
+    keyframes = []
+    for item in bundle.get("keyframes", []):
+        if not isinstance(item, dict):
+            continue
+        timestamp = item.get("timestamp_seconds")
+        end_seconds = item.get("end_seconds", timestamp)
+        if timestamp is None or not _overlaps(start, end, timestamp, end_seconds):
+            continue
+        keyframes.append({
+            "timestamp_seconds": float(timestamp),
+            "end_seconds": float(end_seconds),
+            "object_key": item.get("object_key"),
+            "sample_type": item.get("sample_type", "unknown"),
+            "source": "render_evidence.keyframes",
+        })
+
     observations = []
     for modality, key in (
         ("visual", "visual_observations"),
@@ -145,6 +161,7 @@ def _temporal_evidence(
 
     return {
         "transcript_segments": transcript,
+        "keyframes": keyframes,
         "observations": observations,
         "story_beats": beats,
         "available_modalities": sorted(
