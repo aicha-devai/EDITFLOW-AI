@@ -61,38 +61,40 @@ test.beforeEach(async ({ page }) => {
       if (!state.has(video)) state.set(video, { currentTime: 0, paused: true, playCalls: 0 });
       return state.get(video);
     };
-    Object.defineProperty(HTMLVideoElement.prototype, "duration", {
-      configurable: true,
-      get: () => 60,
-    });
-    Object.defineProperty(HTMLVideoElement.prototype, "readyState", {
-      configurable: true,
-      get: () => 1,
-    });
-    Object.defineProperty(HTMLVideoElement.prototype, "currentTime", {
-      configurable: true,
-      get() { return ensure(this).currentTime; },
-      set(value) {
-        ensure(this).currentTime = Number(value);
-        this.dispatchEvent(new Event("seeked"));
-      },
-    });
-    Object.defineProperty(HTMLVideoElement.prototype, "paused", {
-      configurable: true,
-      get() { return ensure(this).paused; },
-    });
-    HTMLVideoElement.prototype.load = function () {};
-    HTMLVideoElement.prototype.play = function () {
-      const media = ensure(this);
-      media.paused = false;
-      media.playCalls += 1;
-      this.dispatchEvent(new Event("play"));
-      return Promise.resolve();
+    const installMediaMock = video => {
+      if (video.dataset.playwrightMediaMock === "installed") return;
+      video.dataset.playwrightMediaMock = "installed";
+      Object.defineProperties(video, {
+        duration: { configurable: true, get: () => 60 },
+        readyState: { configurable: true, get: () => 1 },
+        currentTime: {
+          configurable: true,
+          get() { return ensure(this).currentTime; },
+          set(value) {
+            ensure(this).currentTime = Number(value);
+            this.dispatchEvent(new Event("seeked"));
+          },
+        },
+        paused: { configurable: true, get() { return ensure(this).paused; } },
+      });
+      video.load = function () {};
+      video.play = function () {
+        const media = ensure(this);
+        media.paused = false;
+        media.playCalls += 1;
+        this.dispatchEvent(new Event("play"));
+        return Promise.resolve();
+      };
+      video.pause = function () {
+        ensure(this).paused = true;
+        this.dispatchEvent(new Event("pause"));
+      };
     };
-    HTMLVideoElement.prototype.pause = function () {
-      ensure(this).paused = true;
-      this.dispatchEvent(new Event("pause"));
-    };
+    const installExisting = () => document.querySelectorAll("video").forEach(installMediaMock);
+    const observer = new MutationObserver(installExisting);
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+    document.addEventListener("DOMContentLoaded", installExisting, { once: true });
+    installExisting();
   });
 
   await page.route("**/v1/projects/**/renders/**/story-continuity", route =>
