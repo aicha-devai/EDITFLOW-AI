@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from typing import Any
 from uuid import UUID
 
@@ -22,7 +23,7 @@ from app.versioning import VersionConflict, save_timeline
 _INTENT_CUES = {
     "black_segment": (
         "blackout", "fade to black", "cut to black", "black screen",
-        "darkness", "dramatic pause", "before the reveal", "reveal",
+        "intentional darkness", "before the reveal",
     ),
     "frozen_scene": (
         "freeze frame", "freeze-frame", "hold frame", "still frame",
@@ -102,7 +103,7 @@ def generate_qc_critic_proposals(
             ("editorial_or_story_notes", global_context),
         ):
             joined = " ".join(values).casefold()
-            cues = [cue for cue in _INTENT_CUES[kind] if cue in joined]
+            cues = [cue for cue in _INTENT_CUES[kind] if re.search(r"(?<!\\w)" + re.escape(cue) + r"(?!\\w)", joined)]
             if cues:
                 matched_cues.extend(cues)
                 matched_sources.append(source_name)
@@ -141,6 +142,7 @@ def generate_qc_critic_proposals(
             "end_seconds": identity["end_seconds"],
             "recommendation": recommendation,
             "confidence": confidence,
+            "confidence_type": "heuristic_score_not_probability",
             "matched_cues": sorted(set(matched_cues)),
             "evidence_sources": matched_sources,
             "explanation": explanation,
