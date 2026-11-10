@@ -1,5 +1,6 @@
 from uuid import UUID
 from fastapi import FastAPI, Depends, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.db import get_db
@@ -20,6 +21,14 @@ from app.versioning import (
 )
 
 app = FastAPI(title=settings.api_title, version="0.1.0")
+_allowed_origins = [origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_allowed_origins,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Accept", "Content-Type", "Authorization"],
+)
 
 @app.get("/health")
 async def health():
