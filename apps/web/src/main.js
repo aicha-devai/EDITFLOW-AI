@@ -365,6 +365,51 @@ function renderEdgeInspector() {
     <div class="inspector-divider"></div><div class="mini-heading">EVIDENCE REFERENCES <b>${refs.length}</b></div><div class="evidence-list">${refs.map(e=>renderEvidenceCard(e)).join("") || '<p class="muted">No resolvable evidence references.</p>'}</div>
     <div class="provenance"><span>HUMAN REVIEW</span><small>${edge.requires_human_review ? "Required" : "Not required for timestamp relation"}</small><code>${escapeHtml(edge.id)}</code></div>`;
 }
+function refreshInspector() {
+  const panel = $(".inspector");
+  if (!panel) return;
+  const selected = state.selectedId ? evidenceFor(state.selectedId) : null;
+  panel.innerHTML = selected
+    ? renderNodeInspector(selected)
+    : state.selectedEdgeId ? renderEdgeInspector() : renderOverviewInspector();
+  $$(".graph-node").forEach(el => {
+    el.classList.toggle("node-selected", el.dataset.node === state.selectedId);
+  });
+  bindInspectorActions();
+}
+function inspectEdge(edgeId) {
+  const edge = state.graph.edges.find(item => item.id === edgeId);
+  if (!edge) return;
+  state.selectedEdgeId = edgeId;
+  state.selectedId = null;
+  refreshInspector();
+  const ref = (edge.evidence_refs || []).map(evidenceFor).filter(Boolean)
+    .sort((a,b) => (hasTimestamp(a.start_seconds) ? Number(a.start_seconds) : Infinity) -
+                   (hasTimestamp(b.start_seconds) ? Number(b.start_seconds) : Infinity))[0];
+  if (ref && hasTimestamp(ref.start_seconds)) seekToTimestamp(ref.start_seconds);
+}
+function selectGraphNode(nodeId, seek = true) {
+  const node = evidenceFor(nodeId);
+  if (!node) return;
+  state.selectedId = nodeId;
+  state.selectedEdgeId = null;
+  refreshInspector();
+  if (seek && hasTimestamp(node.start_seconds)) seekToTimestamp(node.start_seconds);
+}
+function bindInspectorActions() {
+  $$("[data-inspect-edge]").forEach(el => {
+    el.addEventListener("click", () => inspectEdge(el.dataset.inspectEdge));
+  });
+  $$("[data-select-node]").forEach(el => {
+    el.addEventListener("click", () => selectGraphNode(el.dataset.selectNode));
+  });
+  $("#clear-selection")?.addEventListener("click", () => {
+    state.selectedId = null;
+    state.selectedEdgeId = null;
+    refreshInspector();
+  });
+}
+
 function bindShell() {
   $("#load-form")?.addEventListener("submit", async e => {
     e.preventDefault();
@@ -401,37 +446,22 @@ async function loadGraph() {
 function bindExplorer() {
   $("#graph-search")?.addEventListener("input",e=>{state.search=e.target.value;const pos=e.target.selectionStart;render();const input=$("#graph-search");input.focus();input.setSelectionRange(pos,pos);});
   $$("[data-filter]").forEach(btn=>btn.addEventListener("click",()=>{state.filter=btn.dataset.filter;state.selectedId=null;state.selectedEdgeId=null;render();}));
-  $$("[data-node]").forEach(el=>{
-    const select=()=>{const node=evidenceFor(el.dataset.node);state.selectedId=el.dataset.node;state.selectedEdgeId=null;render();if(node && hasTimestamp(node.start_seconds))seekToTimestamp(node.start_seconds);};
+  $("[data-node]").forEach(el=>{
+    const select=()=>selectGraphNode(el.dataset.node);
     el.addEventListener("click",select);
     el.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();select();}});
   });
   $("[data-edge]").forEach(el=>{
-    const inspect=()=>{
-      const edge=state.graph.edges.find(x=>x.id===el.dataset.edge);
-      state.selectedEdgeId=el.dataset.edge;state.selectedId=null;render();
-      const ref=(edge?.evidence_refs||[]).map(evidenceFor).filter(Boolean)
-        .sort((a,b)=>(hasTimestamp(a.start_seconds)?Number(a.start_seconds):Infinity)-(hasTimestamp(b.start_seconds)?Number(b.start_seconds):Infinity))[0];
-      if(ref && hasTimestamp(ref.start_seconds)) seekToTimestamp(ref.start_seconds);
-    };
+    const inspect=()=>inspectEdge(el.dataset.edge);
     el.addEventListener("click",inspect);
     el.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();inspect();}});
   });
-  $("[data-inspect-edge]").forEach(el=>el.addEventListener("click",()=>{
-    const edge=state.graph.edges.find(x=>x.id===el.dataset.inspectEdge);
-    state.selectedEdgeId=el.dataset.inspectEdge;state.selectedId=null;render();
-    const ref=(edge?.evidence_refs||[]).map(evidenceFor).filter(Boolean)
-      .sort((a,b)=>(hasTimestamp(a.start_seconds)?Number(a.start_seconds):Infinity)-(hasTimestamp(b.start_seconds)?Number(b.start_seconds):Infinity))[0];
-    if(ref && hasTimestamp(ref.start_seconds)) seekToTimestamp(ref.start_seconds);
-  }));
-  $$("[data-select-node]").forEach(el=>el.addEventListener("click",()=>{const node=evidenceFor(el.dataset.selectNode);state.selectedId=el.dataset.selectNode;state.selectedEdgeId=null;render();if(node && hasTimestamp(node.start_seconds))seekToTimestamp(node.start_seconds);}));
-  $$("[data-evidence-node]").forEach(el=>el.addEventListener("click",()=>{
-    const node=evidenceFor(el.dataset.evidenceNode);
-    if(node){state.selectedId=node.id;state.selectedEdgeId=null;render();}
+  bindInspectorActions();
+  $("[data-evidence-node]").forEach(el=>el.addEventListener("click",()=>{
+    selectGraphNode(el.dataset.evidenceNode, false);
     seekToTimestamp(el.dataset.jumpTime);
   }));
   $$("[data-jump-time]:not([data-evidence-node])").forEach(el=>el.addEventListener("click",()=>seekToTimestamp(el.dataset.jumpTime)));
-  $("#clear-selection")?.addEventListener("click",()=>{state.selectedId=null;state.selectedEdgeId=null;render();});
   $("#zoom-in")?.addEventListener("click",()=>scaleGraph(1.15));
   $("#zoom-out")?.addEventListener("click",()=>scaleGraph(.87));
   $("#fit-graph")?.addEventListener("click",()=>{state.zoom=1;applyZoom();});
