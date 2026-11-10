@@ -38,6 +38,9 @@ def test_graph_links_story_beats_to_timestamped_narration_visuals_and_shots():
     assert any(edge["type"] == "narrates" and edge["source"] == "transcript:0" for edge in result["edges"])
     assert any(edge["type"] == "observed_during" and edge["source"] == "visual:0" for edge in result["edges"])
     assert any(edge["type"] == "sampled_during" and edge["source"] == "shot:0" for edge in result["edges"])
+    assert any(edge["type"] == "temporally_associated_with"
+               and edge["source"] == "visual:0" and edge["target"] == "shot:0"
+               for edge in result["edges"])
     assert result["entity_extraction_status"] == "not_configured"
 
 
