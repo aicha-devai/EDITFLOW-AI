@@ -225,6 +225,25 @@ async def build_story_continuity_graph(
                 "requires_human_review": False,
             })
 
+    # Associate frame-derived visual observations with representative samples by time only.
+    visual_sources = [(key, value) for key, value in sources.items() if value["kind"] == "visual"]
+    shot_sources = [(key, value) for key, value in sources.items() if value["kind"] == "shot"]
+    for visual_id, visual in visual_sources:
+        for shot_id, shot in shot_sources:
+            point_shot = shot["start_seconds"] == shot["end_seconds"]
+            overlaps = (visual["start_seconds"] <= shot["start_seconds"] < visual["end_seconds"]
+                        if point_shot else _overlaps(
+                            visual["start_seconds"], visual["end_seconds"],
+                            shot["start_seconds"], shot["end_seconds"]))
+            if overlaps:
+                edges.append({
+                    "id": _stable_id("edge", f"{visual_id}|temporally_associated_with|{shot_id}"),
+                    "source": visual_id, "target": shot_id, "type": "temporally_associated_with",
+                    "evidence_refs": [visual_id, shot_id],
+                    "verification_status": "verified_by_timestamp_overlap",
+                    "requires_human_review": False,
+                })
+
     # Link evidence to every beat it overlaps; this is temporal alignment, not semantic agreement.
     for beat in beats:
         for source_id, source in sources.items():
@@ -273,10 +292,14 @@ async def build_story_continuity_graph(
         )
         return graph
 
+    semantic_sources = {
+        source_id: source for source_id, source in sources.items()
+        if source["kind"] in {"transcript", "visual"} and source["text"].strip()
+    }
     model_sources = [{
         "id": source_id, "kind": source["kind"], "start_seconds": source["start_seconds"],
         "end_seconds": source["end_seconds"], "text": source["text"][:700],
-    } for source_id, source in sources.items()]
+    } for source_id, source in semantic_sources.items()]
     prompt = (
         "Extract a conservative story continuity graph from only the supplied timestamped evidence. "
         "Return JSON with entities [{id,type,name,description,evidence_refs}] where type is character, "
@@ -301,7 +324,7 @@ async def build_story_continuity_graph(
             )
             response.raise_for_status()
             parsed = json.loads(response.json()["choices"][0]["message"]["content"])
-        entity_nodes, semantic_edges, rejected = _validate_model_graph(parsed, sources)
+        entity_nodes, semantic_edges, rejected = _validate_model_graph(parsed, semantic_sources)
         graph["nodes"].extend(entity_nodes)
         graph["edges"].extend(semantic_edges)
         # Explicitly connect extracted entities to the exact evidence nodes that support them.
