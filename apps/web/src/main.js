@@ -162,11 +162,12 @@ function bindVideoPlayer() {
   const video = $("#story-video");
   if (!video) return;
   const restore = () => {
-    const target = state.pendingSeekSeconds !== null ? state.pendingSeekSeconds : state.playbackSeconds;
+    const hadPendingSeek = state.pendingSeekSeconds !== null;
+    const target = hadPendingSeek ? state.pendingSeekSeconds : state.playbackSeconds;
     if (Number.isFinite(video.duration) && video.duration > 0) {
       video.currentTime = Math.min(target, Math.max(0, video.duration - 0.05));
-      if (state.pendingSeekSeconds !== null) state.pendingSeekSeconds = null;
-      if (state.playbackWasPlaying || state.pendingSeekSeconds === null && target > 0) {
+      if (hadPendingSeek) state.pendingSeekSeconds = null;
+      if (state.playbackWasPlaying) {
         const promise = video.play();
         if (promise?.catch) promise.catch(() => {});
       }
