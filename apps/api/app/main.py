@@ -223,6 +223,8 @@ async def get_story_continuity_graph(project_id: UUID, job_id: UUID, db: AsyncSe
         "job_id": str(job.id),
         "timeline_version_id": str(job.timeline_version_id),
         "timeline_hash": job.timeline_hash,
+        "media_available": bool(job.output_object_key),
+        "media_url": f"/v1/projects/{project_id}/renders/{job_id}/media" if job.output_object_key else None,
         "graph": graph,
     }
 
