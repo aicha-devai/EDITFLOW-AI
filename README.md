@@ -80,3 +80,14 @@ The explorer supports:
 - Graph zoom controls and responsive layout.
 
 For non-local hosting, set `EDITFLOW_CORS_ORIGINS` to a comma-separated allowlist of the exact browser origins hosting the explorer. Do not use a wildcard for a credentialed or public deployment. The current API does not implement workspace authentication; keep it on a trusted development network until authorization is added.
+
+
+### Timestamp-linked video playback
+
+After loading a successful Render Job, the Explorer requests the immutable rendered MP4 from:
+
+`GET /v1/projects/{project_id}/renders/{job_id}/media`
+
+Local storage is streamed through a range-capable API response; S3 storage uses a short-lived presigned redirect. The player uses browser-native seeking and HTTP byte ranges, so clicking a timestamped shot, narration segment, visual observation, story beat, or evidence card jumps to that point in the rendered video. Entity and relationship selections jump to their earliest resolvable evidence timestamp when one exists.
+
+The player does not expose raw storage object keys as public URLs and does not modify the Render Job or Timeline.
