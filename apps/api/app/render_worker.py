@@ -191,6 +191,18 @@ async def render_claimed_job(
                     "transcript_segments": [], "visual_observations": [],
                     "audio_observations": [], "visual_semantics_status": "not_configured",
                 }
+                quality_report["story_analysis"] = {
+                    "status": "unavailable", "analysis_status": "not_available",
+                    "segments": [], "findings": [], "semantic_findings": [],
+                    "limitations": ["Evidence extraction failed; story sequence analysis was not run."],
+                }
+                quality_report["story_continuity_graph"] = {
+                    "schema_version": "1.0", "status": "insufficient_evidence",
+                    "engine": "story_continuity_graph_v1", "nodes": [], "edges": [],
+                    "entity_extraction_status": "not_available",
+                    "limitations": ["Evidence extraction failed; no evidence graph could be built."],
+                    "integrity": {"all_edges_have_evidence": True, "automatic_timeline_changes": 0},
+                }
 
             job.quality_report = quality_report
             await session.flush()
