@@ -163,6 +163,27 @@ async def get_qc_critic_suggestions(project_id: UUID, job_id: UUID, db: AsyncSes
     }
 
 
+@app.get("/v1/projects/{project_id}/renders/{job_id}/story-continuity")
+async def get_story_continuity_graph(project_id: UUID, job_id: UUID, db: AsyncSession = Depends(get_db)):
+    job = await db.scalar(select(RenderJob).where(
+        RenderJob.id == job_id, RenderJob.project_id == project_id
+    ))
+    if job is None:
+        raise HTTPException(404, "Render job not found")
+    if job.status != "succeeded":
+        raise HTTPException(409, "Story Continuity Graph is available only after a successful render")
+    report = job.quality_report if isinstance(job.quality_report, dict) else {}
+    graph = report.get("story_continuity_graph")
+    if not isinstance(graph, dict):
+        raise HTTPException(404, "Story Continuity Graph is not available for this render")
+    return {
+        "job_id": str(job.id),
+        "timeline_version_id": str(job.timeline_version_id),
+        "timeline_hash": job.timeline_hash,
+        "graph": graph,
+    }
+
+
 @app.post("/v1/projects/{project_id}/renders/{job_id}/qc-critic/approve")
 async def approve_qc_critic_suggestions(
     project_id: UUID, job_id: UUID, payload: QCCriticApprovalRequest,
