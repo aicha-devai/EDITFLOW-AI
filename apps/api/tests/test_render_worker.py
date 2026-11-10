@@ -60,6 +60,22 @@ async def test_worker_renders_pinned_snapshot_and_stores_output(db_session, tmp_
         return {"schema_version": "1.0", "status": "warnings", "summary": {"warning_count": 1},
                 "findings": [{"code": "frozen_scene", "severity": "warning"}]}
     monkeypatch.setattr(worker_module, "analyze_render_quality", fake_qc)
+
+    async def fake_evidence(*args, **kwargs):
+        return {
+            "schema_version": "1.0", "extraction_status": "completed",
+            "keyframes": [],
+            "transcript_segments": [
+                {"start_seconds": 0.5, "end_seconds": 1.5, "text": "A witness entered the station."},
+            ],
+            "visual_observations": [
+                {"start_seconds": 0.5, "end_seconds": 1.5, "description": "A person stands inside a train station."},
+            ],
+            "audio_observations": [],
+            "transcription": {"status": "completed"},
+            "visual_semantics_status": "completed",
+        }
+    monkeypatch.setattr(worker_module, "extract_render_evidence", fake_evidence)
     finished = await render_claimed_job(
         db_session, job.id, storage, tmp_path / "work", timeout_seconds=10
     )
@@ -67,6 +83,12 @@ async def test_worker_renders_pinned_snapshot_and_stores_output(db_session, tmp_
     assert finished.status == "succeeded"
     assert finished.quality_report["status"] == "warnings"
     assert finished.quality_report["findings"][0]["code"] == "frozen_scene"
+    assert finished.quality_report["story_analysis"]["status"] == "completed"
+    graph = finished.quality_report["story_continuity_graph"]
+    assert graph["status"] == "completed"
+    assert any(node["type"] == "story_beat" for node in graph["nodes"])
+    assert any(edge["type"] == "narrates" for edge in graph["edges"])
+    assert any(edge["type"] == "observed_during" for edge in graph["edges"])
     assert finished.output_object_key == f"renders/{project.id}/{job.id}/attempt-1.mp4"
     assert storage._resolve(finished.output_object_key).read_bytes() == b"rendered-video"
 
