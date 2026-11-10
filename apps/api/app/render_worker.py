@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.evidence_extraction import EvidenceExtractionError, extract_render_evidence
 from app.story_analysis import analyze_story_sequence
+from app.story_continuity import build_story_continuity_graph
 from app.media_probe import probe_media
 from app.models import Asset, RenderJob
 from app.render_engine import build_ffmpeg_plan
@@ -153,13 +154,36 @@ async def render_claimed_job(
                     audio_artifact["object_key"] = audio_key
                     audio_artifact.pop("filename", None)
                 quality_report["evidence"] = evidence
-                quality_report["story_analysis"] = await analyze_story_sequence(
-                    snapshot, evidence,
-                    api_key=settings.evidence_vision_api_key,
-                    endpoint=settings.evidence_vision_endpoint,
-                    model=settings.evidence_vision_model,
-                    timeout_seconds=min(timeout_seconds, settings.evidence_extraction_timeout_seconds),
-                )
+                try:
+                    story_analysis = await analyze_story_sequence(
+                        snapshot, evidence,
+                        api_key=settings.evidence_vision_api_key,
+                        endpoint=settings.evidence_vision_endpoint,
+                        model=settings.evidence_vision_model,
+                        timeout_seconds=min(timeout_seconds, settings.evidence_extraction_timeout_seconds),
+                    )
+                    quality_report["story_analysis"] = story_analysis
+                except Exception as exc:
+                    story_analysis = {"status": "failed", "analysis_status": "failed",
+                                      "segments": [], "findings": [], "semantic_findings": [],
+                                      "limitations": [f"Story analysis unavailable: {str(exc)[:250]}"]}
+                    quality_report["story_analysis"] = story_analysis
+                try:
+                    quality_report["story_continuity_graph"] = await build_story_continuity_graph(
+                        snapshot, evidence, story_analysis,
+                        api_key=settings.evidence_vision_api_key,
+                        endpoint=settings.evidence_vision_endpoint,
+                        model=settings.evidence_vision_model,
+                        timeout_seconds=min(timeout_seconds, settings.evidence_extraction_timeout_seconds, 300),
+                    )
+                except Exception as exc:
+                    quality_report["story_continuity_graph"] = {
+                        "schema_version": "1.0", "status": "failed",
+                        "engine": "story_continuity_graph_v1", "nodes": [], "edges": [],
+                        "entity_extraction_status": "failed",
+                        "limitations": [f"Continuity graph unavailable: {str(exc)[:250]}"],
+                        "integrity": {"all_edges_have_evidence": True, "automatic_timeline_changes": 0},
+                    }
             except EvidenceExtractionError as exc:
                 quality_report["evidence"] = {
                     "schema_version": "1.0", "extraction_status": "failed",
