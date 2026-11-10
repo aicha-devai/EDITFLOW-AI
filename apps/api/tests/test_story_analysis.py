@@ -83,3 +83,29 @@ def test_story_analysis_does_not_claim_semantic_review_without_provider():
     assert result["analysis_status"] == "not_configured"
     assert result["semantic_findings"] == []
     assert result["limitations"]
+
+
+def test_story_analysis_detects_near_duplicate_shots_from_frame_fingerprints():
+    import asyncio
+    timeline = {
+        "sequence": {"story_beats": [
+            {"id": "b1", "title": "Opening", "start_seconds": 0, "end_seconds": 3},
+            {"id": "b2", "title": "Later", "start_seconds": 4, "end_seconds": 8},
+        ]},
+        "clips": [],
+    }
+    evidence = {
+        "transcript_segments": [],
+        "visual_observations": [],
+        "keyframes": [
+            {"timestamp_seconds": 1, "end_seconds": 2, "object_key": "frame/a.jpg",
+             "perceptual_hash": "0000000000000000"},
+            {"timestamp_seconds": 6, "end_seconds": 7, "object_key": "frame/b.jpg",
+             "perceptual_hash": "0000000000000001"},
+        ],
+    }
+    result = asyncio.run(analyze_story_sequence(timeline, evidence))
+    duplicate = next(item for item in result["findings"] if item["code"] == "possible_duplicate_shot")
+    assert duplicate["hamming_distance"] == 1
+    assert duplicate["evidence_refs"][0]["object_key"] == "frame/a.jpg"
+    assert duplicate["evidence_refs"][1]["object_key"] == "frame/b.jpg"
