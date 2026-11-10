@@ -7,6 +7,10 @@ const state = {
   projectId: "",
   jobId: "",
   graph: null,
+  mediaUrl: "",
+  playbackSeconds: 0,
+  playbackWasPlaying: false,
+  pendingSeekSeconds: null,
   selectedId: null,
   selectedEdgeId: null,
   filter: "all",
@@ -54,6 +58,11 @@ function evidenceFor(id) {
   return state.graph?.nodes?.find(n => n.id === id) || null;
 }
 function render() {
+  const oldVideo = $("#story-video");
+  if (oldVideo && Number.isFinite(oldVideo.currentTime)) {
+    state.playbackSeconds = oldVideo.currentTime;
+    state.playbackWasPlaying = !oldVideo.paused;
+  }
   $("#app").innerHTML = `
     <div class="shell">
       <aside class="rail">
@@ -111,6 +120,78 @@ function renderWelcome() {
       <div class="welcome-text"><span class="eyebrow">YOUR STORY, DECODED</span><h2>A connected view of every story element.</h2><p>Enter a Project ID and a successful Render Job ID above. The explorer will map the graph returned by the API and let you inspect every evidence link.</p><div class="welcome-tags"><span>Characters</span><span>Places</span><span>Events</span><span>Shots</span><span>Voiceover</span></div></div>
     </section>`;
 }
+
+function renderVideoPlayer() {
+  if (!state.mediaUrl) return `
+    <section class="video-panel video-unavailable">
+      <div><span class="eyebrow">RENDER PLAYBACK</span><h2>Video preview unavailable</h2><p>The Render Job has no accessible output media. Confirm it completed successfully and that its storage object is present.</p></div>
+    </section>`;
+  return `
+    <section class="video-panel">
+      <div class="video-panel-head"><div><span class="eyebrow">RENDER PLAYBACK</span><h2>Evidence video</h2><p>Choose a timestamped evidence item to seek directly to its moment.</p></div><div class="player-time" id="player-time">${fmtTime(state.playbackSeconds)}</div></div>
+      <video id="story-video" controls playsinline preload="metadata">
+        <source src="${escapeHtml(state.mediaUrl)}" type="video/mp4">
+        Your browser does not support HTML5 video.
+      </video>
+      <div class="player-foot"><span>Original rendered output</span><span>Seeking uses source timestamps from the evidence graph</span></div>
+    </section>`;
+}
+function seekToTimestamp(value, autoplay = true) {
+  const seconds = Number(value);
+  if (!Number.isFinite(seconds) || seconds < 0) return;
+  state.pendingSeekSeconds = seconds;
+  const video = $("#story-video");
+  if (!video) return;
+  const applySeek = () => {
+    const max = Number.isFinite(video.duration) ? Math.max(0, video.duration - 0.05) : seconds;
+    const target = Math.min(seconds, max);
+    try { video.currentTime = target; } catch { return; }
+    state.playbackSeconds = target;
+    state.pendingSeekSeconds = null;
+    const time = $("#player-time");
+    if (time) time.textContent = fmtTime(target);
+    if (autoplay) {
+      const promise = video.play();
+      if (promise?.catch) promise.catch(() => {});
+    }
+  };
+  if (video.readyState >= 1 && Number.isFinite(video.duration)) applySeek();
+  else video.addEventListener("loadedmetadata", applySeek, { once: true });
+}
+function bindVideoPlayer() {
+  const video = $("#story-video");
+  if (!video) return;
+  const restore = () => {
+    const target = state.pendingSeekSeconds !== null ? state.pendingSeekSeconds : state.playbackSeconds;
+    if (Number.isFinite(video.duration) && video.duration > 0) {
+      video.currentTime = Math.min(target, Math.max(0, video.duration - 0.05));
+      if (state.pendingSeekSeconds !== null) state.pendingSeekSeconds = null;
+      if (state.playbackWasPlaying || state.pendingSeekSeconds === null && target > 0) {
+        const promise = video.play();
+        if (promise?.catch) promise.catch(() => {});
+      }
+    }
+  };
+  if (video.readyState >= 1) restore();
+  else video.addEventListener("loadedmetadata", restore, { once: true });
+  video.addEventListener("timeupdate", () => {
+    state.playbackSeconds = video.currentTime;
+    const time = $("#player-time");
+    if (time) time.textContent = fmtTime(video.currentTime);
+  });
+  video.addEventListener("play", () => { state.playbackWasPlaying = true; });
+  video.addEventListener("pause", () => { state.playbackWasPlaying = false; });
+  video.addEventListener("error", () => {
+    const panel = $(".video-panel");
+    if (panel) {
+      const message = video.error?.code === 4 ? "The media URL or video format is not supported." : "Could not load the rendered video. Check API access and storage availability.";
+      let notice = $(".video-error", panel);
+      if (!notice) { notice = document.createElement("p"); notice.className = "video-error"; panel.append(notice); }
+      notice.textContent = message;
+    }
+  });
+}
+
 function renderExplorer() {
   const graph = state.graph;
   const counts = Object.keys(typeMeta).map(type => ({ type, count: graph.nodes.filter(n => n.type === type).length })).filter(x => x.count);
@@ -124,6 +205,7 @@ function renderExplorer() {
       <div class="stat-card"><span>ENTITY EXTRACTION</span><strong class="stat-word">${escapeHtml((graph.entity_extraction_status || "unknown").replaceAll("_"," "))}</strong><small>Semantic extraction state</small></div>
       <div class="stat-card"><span>GRAPH STATUS</span><strong class="status-word ${status === "completed" ? "good" : "warn"}">${escapeHtml(status.replaceAll("_"," "))}</strong><small>${graph.integrity?.automatic_timeline_changes ?? 0} automatic timeline edits</small></div>
     </section>
+    ${renderVideoPlayer()}
     <section class="explorer-layout">
       <div class="graph-column">
         <div class="graph-toolbar">
@@ -223,7 +305,7 @@ function renderNodeInspector(node) {
 }
 function renderEvidenceCard(node) {
   const meta = nodeType(node);
-  return `<div class="evidence-card"><div class="evidence-card-top"><span class="evidence-kind" style="--entity:${meta.color}">${meta.icon} ${meta.label}</span><span class="evidence-time">${fmtTime(node.start_seconds)}${node.end_seconds !== undefined && node.end_seconds !== node.start_seconds ? " – "+fmtTime(node.end_seconds) : ""}</span></div><p>${escapeHtml(nodeTitle(node))}</p>${node.object_key ? `<small class="object-key">${escapeHtml(node.object_key)}</small>` : ""}<button class="evidence-select" data-select-node="${escapeHtml(node.id)}">Inspect evidence ↗</button></div>`;
+  return `<div class="evidence-card"><div class="evidence-card-top"><span class="evidence-kind" style="--entity:${meta.color}">${meta.icon} ${meta.label}</span><span class="evidence-time">${fmtTime(node.start_seconds)}${node.end_seconds !== undefined && node.end_seconds !== node.start_seconds ? " – "+fmtTime(node.end_seconds) : ""}</span></div><p>${escapeHtml(nodeTitle(node))}</p>${node.object_key ? `<small class="object-key">${escapeHtml(node.object_key)}</small>` : ""}<div class="evidence-actions"><button class="evidence-select" data-select-node="${escapeHtml(node.id)}">Inspect evidence</button>${Number.isFinite(Number(node.start_seconds)) ? `<button class="evidence-jump" data-jump-time="${Number(node.start_seconds)}">▶ Jump to ${fmtTime(node.start_seconds)}</button>` : ""}</div></div>`;
 }
 function renderEdgeInspector() {
   const edge = state.graph.edges.find(e=>e.id===state.selectedEdgeId);
@@ -264,7 +346,7 @@ async function loadGraph() {
     if(!response.ok) throw new Error(body.detail || `Request failed (${response.status})`);
     const graph=body.graph;
     if(!graph || !Array.isArray(graph.nodes) || !Array.isArray(graph.edges)) throw new Error("The API response does not contain a valid graph.");
-    state.graph=graph; state.selectedId=null; state.selectedEdgeId=null; state.search=""; state.filter="all";
+    state.graph=graph; state.mediaUrl=body.media_available && body.media_url ? base + body.media_url : ""; state.playbackSeconds=0; state.playbackWasPlaying=false; state.pendingSeekSeconds=null; state.selectedId=null; state.selectedEdgeId=null; state.search=""; state.filter="all";
   } catch(error) {
     state.error=error.message || "Could not load the Story Continuity Graph.";
   } finally {
@@ -275,18 +357,20 @@ function bindExplorer() {
   $("#graph-search")?.addEventListener("input",e=>{state.search=e.target.value;const pos=e.target.selectionStart;render();const input=$("#graph-search");input.focus();input.setSelectionRange(pos,pos);});
   $$("[data-filter]").forEach(btn=>btn.addEventListener("click",()=>{state.filter=btn.dataset.filter;state.selectedId=null;state.selectedEdgeId=null;render();}));
   $$("[data-node]").forEach(el=>{
-    const select=()=>{state.selectedId=el.dataset.node;state.selectedEdgeId=null;render();};
+    const select=()=>{const node=evidenceFor(el.dataset.node);state.selectedId=el.dataset.node;state.selectedEdgeId=null;render();if(node && Number.isFinite(Number(node.start_seconds)))seekToTimestamp(node.start_seconds);};
     el.addEventListener("click",select);
     el.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();select();}});
   });
-  $$("[data-edge]").forEach(el=>el.addEventListener("click",()=>{state.selectedEdgeId=el.dataset.edge;state.selectedId=null;render();}));
-  $$("[data-inspect-edge]").forEach(el=>el.addEventListener("click",()=>{state.selectedEdgeId=el.dataset.inspectEdge;state.selectedId=null;render();}));
-  $$("[data-select-node]").forEach(el=>el.addEventListener("click",()=>{state.selectedId=el.dataset.selectNode;state.selectedEdgeId=null;render();}));
+  $("[data-edge]").forEach(el=>el.addEventListener("click",()=>{const edge=state.graph.edges.find(x=>x.id===el.dataset.edge);state.selectedEdgeId=el.dataset.edge;state.selectedId=null;render();const ref=(edge?.evidence_refs||[]).map(evidenceFor).filter(Boolean).sort((a,b)=>(a.start_seconds??Infinity)-(b.start_seconds??Infinity))[0];if(ref && Number.isFinite(Number(ref.start_seconds)))seekToTimestamp(ref.start_seconds);}));
+  $("[data-inspect-edge]").forEach(el=>el.addEventListener("click",()=>{const edge=state.graph.edges.find(x=>x.id===el.dataset.inspectEdge);state.selectedEdgeId=el.dataset.inspectEdge;state.selectedId=null;render();const ref=(edge?.evidence_refs||[]).map(evidenceFor).filter(Boolean).sort((a,b)=>(a.start_seconds??Infinity)-(b.start_seconds??Infinity))[0];if(ref && Number.isFinite(Number(ref.start_seconds)))seekToTimestamp(ref.start_seconds);}));
+  $("[data-select-node]").forEach(el=>el.addEventListener("click",()=>{const node=evidenceFor(el.dataset.selectNode);state.selectedId=el.dataset.selectNode;state.selectedEdgeId=null;render();if(node && Number.isFinite(Number(node.start_seconds)))seekToTimestamp(node.start_seconds);}));
+  $("[data-jump-time]").forEach(el=>el.addEventListener("click",()=>seekToTimestamp(el.dataset.jumpTime)));
   $("#clear-selection")?.addEventListener("click",()=>{state.selectedId=null;state.selectedEdgeId=null;render();});
   $("#zoom-in")?.addEventListener("click",()=>scaleGraph(1.15));
   $("#zoom-out")?.addEventListener("click",()=>scaleGraph(.87));
   $("#fit-graph")?.addEventListener("click",()=>{state.zoom=1;applyZoom();});
   applyZoom();
+  bindVideoPlayer();
 }
 function scaleGraph(factor) { state.zoom=Math.max(.65,Math.min(1.8,state.zoom*factor));applyZoom(); }
 function applyZoom() {
