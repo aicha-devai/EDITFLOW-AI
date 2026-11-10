@@ -165,3 +165,53 @@ def test_confidence_is_explicitly_labeled_as_heuristic_not_probability():
     proposal = result["proposals"][0]
     assert proposal["recommendation"] == "mark_intentional"
     assert proposal["confidence_type"] == "heuristic_score_not_probability"
+
+
+
+def test_critic_attaches_timestamped_multimodal_evidence_and_story_beat_context():
+    result = generate_qc_critic_proposals(
+        {
+            "findings": [{"code": "frozen_scene", "start_seconds": 4, "end_seconds": 7}],
+            "evidence": {
+                "transcript_segments": [
+                    {"start_seconds": 3, "end_seconds": 5, "text": "Look closely at the photograph."},
+                    {"start_seconds": 8, "end_seconds": 9, "text": "Outside the event window."},
+                ],
+                "visual_observations": [
+                    {"start_seconds": 5, "end_seconds": 6, "description": "A still evidence-board frame."},
+                ],
+                "audio_observations": [
+                    {"start_seconds": 4, "end_seconds": 7, "description": "Narration continues clearly."},
+                ],
+            },
+        },
+        {
+            "sequence": {
+                "story_beats": [{"id": "beat-1", "title": "Evidence reveal"}],
+            },
+            "clips": [{
+                "timeline_start": 3, "source_in": 0, "source_out": 5,
+                "story_beat_id": "beat-1",
+            }],
+        },
+    )
+    evidence = result["proposals"][0]["temporal_evidence"]
+    assert evidence["available_modalities"] == ["audio", "transcript", "visual"]
+    assert len(evidence["transcript_segments"]) == 1
+    assert evidence["observations"][0]["modality"] == "visual"
+    assert {item["modality"] for item in evidence["observations"]} == {"audio", "visual"}
+    assert evidence["story_beats"] == [{"id": "beat-1", "title": "Evidence reveal"}]
+
+
+def test_critic_does_not_claim_multimodal_evidence_when_none_was_supplied():
+    result = generate_qc_critic_proposals(
+        {"findings": [{"code": "black_segment", "start_seconds": 1, "end_seconds": 2}]},
+        {},
+    )
+    evidence = result["proposals"][0]["temporal_evidence"]
+    assert evidence == {
+        "transcript_segments": [],
+        "observations": [],
+        "story_beats": [],
+        "available_modalities": [],
+    }
