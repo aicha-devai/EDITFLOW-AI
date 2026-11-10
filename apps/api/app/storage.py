@@ -31,6 +31,10 @@ class LocalObjectStorage:
             raise StorageError("Object key escapes the configured storage root")
         return candidate
 
+    def resolve_path(self, object_key: str) -> Path:
+        """Return a validated local object path for read-only API streaming."""
+        return self._resolve(object_key)
+
     def materialize(self, object_key: str, destination: str | Path) -> Path:
         source = self._resolve(object_key)
         target = Path(destination).resolve()
