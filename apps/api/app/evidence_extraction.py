@@ -152,7 +152,7 @@ async def transcribe_with_whisper(
                 )
         response.raise_for_status()
         payload = response.json()
-    except (httpx.HTTPError, ValueError) as exc:
+    except Exception as exc:
         return {"status": "failed", "provider": "openai_whisper", "segments": [],
                 "message": str(exc)[:500]}
     segments = []
@@ -241,7 +241,7 @@ async def analyze_keyframes_with_vision(
                             "source": "openai_vision",
                             "model": model,
                         })
-    except (httpx.HTTPError, KeyError, TypeError, ValueError, OSError) as exc:
+    except Exception as exc:
         return {
             "status": "failed", "provider": "openai_compatible_vision",
             "model": model, "observations": observations, "message": str(exc)[:500],
