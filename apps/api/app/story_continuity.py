@@ -285,6 +285,16 @@ async def build_story_continuity_graph(
             "No timestamped transcript, visual observation, or representative frame is available for entity extraction."
         )
         return graph
+    semantic_sources = {
+        source_id: source for source_id, source in sources.items()
+        if source["kind"] in {"transcript", "visual"} and source["text"].strip()
+    }
+    if not semantic_sources:
+        graph["entity_extraction_status"] = "insufficient_semantic_evidence"
+        graph["limitations"].append(
+            "Entity extraction needs timestamped transcript text or visual descriptions; keyframe metadata alone is not semantic evidence."
+        )
+        return graph
     if not api_key:
         graph["limitations"].append(
             "Character/place/event extraction and semantic relations require a configured model. "
@@ -292,10 +302,6 @@ async def build_story_continuity_graph(
         )
         return graph
 
-    semantic_sources = {
-        source_id: source for source_id, source in sources.items()
-        if source["kind"] in {"transcript", "visual"} and source["text"].strip()
-    }
     model_sources = [{
         "id": source_id, "kind": source["kind"], "start_seconds": source["start_seconds"],
         "end_seconds": source["end_seconds"], "text": source["text"][:700],
