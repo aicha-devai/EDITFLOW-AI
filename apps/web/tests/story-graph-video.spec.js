@@ -45,7 +45,7 @@ const graphResponse = {
         target: "shot-12",
         type: "appears_in",
         verification_status: "requires_review",
-        evidence_refs: [],
+        evidence_refs: ["narration-untimed"],
         requires_human_review: true,
       },
     ],
@@ -149,4 +149,21 @@ test("null timestamp evidence is excluded from the evidence track", async ({ pag
 
   await expect(page.locator('[data-evidence-node="narration-untimed"]')).toHaveCount(0);
   await expect(page.locator('[data-evidence-node="shot-12"]')).toHaveCount(1);
+});
+
+test("untimed relationship evidence has no jump control and does not move playback", async ({ page }) => {
+  await loadExplorer(page);
+
+  const video = page.locator("#story-video");
+  await video.evaluate(el => {
+    el.currentTime = 8.5;
+    el.dispatchEvent(new Event("timeupdate"));
+  });
+
+  await page.locator('[data-edge="character-shot"]').click();
+
+  await expect(page.getByText("Unaligned narration")).toBeVisible();
+  await expect(page.locator(".evidence-card [data-jump-time]")).toHaveCount(0);
+  await expect.poll(() => video.evaluate(el => el.currentTime)).toBe(8.5);
+  await expect(page.locator(".evidence-card .evidence-time")).toHaveText("Time unavailable");
 });
