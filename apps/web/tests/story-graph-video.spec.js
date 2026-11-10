@@ -53,36 +53,8 @@ const graphResponse = {
 };
 
 test.beforeEach(async ({ page }) => {
-  // Install the media shim before the app binds its event listeners. The shim
-  // is attached to the prototype so it survives inspector-only and full renders.
-  await page.addInitScript(() => {
-    const mediaState = new WeakMap();
-    const stateFor = element => {
-      if (!mediaState.has(element)) mediaState.set(element, { currentTime: 0, paused: true });
-      return mediaState.get(element);
-    };
-    Object.defineProperties(HTMLMediaElement.prototype, {
-      duration: { configurable: true, get: () => 60 },
-      readyState: { configurable: true, get: () => 1 },
-      currentTime: {
-        configurable: true,
-        get() { return stateFor(this).currentTime; },
-        set(value) { stateFor(this).currentTime = Number(value); },
-      },
-      paused: { configurable: true, get() { return stateFor(this).paused; } },
-    });
-    HTMLMediaElement.prototype.load = function () {};
-    HTMLMediaElement.prototype.play = function () {
-      stateFor(this).paused = false;
-      this.dispatchEvent(new Event("play"));
-      return Promise.resolve();
-    };
-    HTMLMediaElement.prototype.pause = function () {
-      stateFor(this).paused = true;
-      this.dispatchEvent(new Event("pause"));
-    };
-  });
-
+  // A tiny, valid H.264 MP4 lets Chromium exercise the real media element,
+  // metadata lifecycle, seeking and playback instead of a synthetic media shim.
   await page.route("**/v1/projects/**/renders/**/story-continuity", route =>
     route.fulfill({
       status: 200,
@@ -91,7 +63,12 @@ test.beforeEach(async ({ page }) => {
     }),
   );
   await page.route("**/mock-render.mp4", route =>
-    route.fulfill({ status: 200, contentType: "video/mp4", body: Buffer.from("mock-video") }),
+    route.fulfill({
+      status: 200,
+      contentType: "video/mp4",
+      headers: { "accept-ranges": "bytes", "cache-control": "no-store" },
+      body: Buffer.from("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", "base64"),
+    }),
   );
 });
 
@@ -100,7 +77,9 @@ async function loadExplorer(page) {
   await page.locator("#project-input").fill(projectId);
   await page.locator("#job-input").fill(jobId);
   await page.getByRole("button", { name: /load graph/i }).click();
-  await expect(page.locator("#story-video")).toBeVisible();
+  const video = page.locator("#story-video");
+  await expect(video).toBeVisible();
+  await expect.poll(() => video.evaluate(el => el.readyState)).toBeGreaterThanOrEqual(1);
 }
 
 test("clicking timestamped evidence seeks to its exact timestamp and starts playback", async ({ page }) => {
@@ -148,7 +127,7 @@ test("untimed relationship evidence has no jump control and does not move playba
     el.dispatchEvent(new Event("timeupdate"));
   });
 
-  await page.locator('[data-edge="character-shot"]').click();
+  await page.locator('[data-edge="character-shot"]').dispatchEvent("click");
 
   await expect(page.getByText("Unaligned narration")).toBeVisible();
   await expect(page.locator(".evidence-card [data-jump-time]")).toHaveCount(0);
