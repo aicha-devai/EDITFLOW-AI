@@ -285,7 +285,13 @@ def generate_qc_critic_proposals(
             "analysis_status": story_analysis.get("analysis_status", "not_available"),
             "analysis_model": story_analysis.get("analysis_model"),
             "findings": story_findings,
-            "requires_human_review": bool(story_findings),
+            "continuity_graph": quality_report.get("story_continuity_graph", {
+                "status": "not_available", "nodes": [], "edges": [],
+                "entity_extraction_status": "not_available",
+            }),
+            "requires_human_review": bool(story_findings) or bool(
+                quality_report.get("story_continuity_graph", {}).get("edges")
+            ),
             "automatic_changes": 0,
         },
         "automatic_changes": 0,
