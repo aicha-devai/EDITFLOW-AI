@@ -260,6 +260,12 @@ async def build_story_continuity_graph(
             "automatic_timeline_changes": 0,
         },
     }
+    if not sources:
+        graph["status"] = "insufficient_evidence"
+        graph["limitations"].append(
+            "No timestamped transcript, visual observation, or representative frame is available for entity extraction."
+        )
+        return graph
     if not api_key:
         graph["limitations"].append(
             "Character/place/event extraction and semantic relations require a configured model. "
