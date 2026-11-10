@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     evidence_extraction_timeout_seconds: int = Field(
         default=900, ge=30, le=3600, validation_alias="EDITFLOW_EVIDENCE_TIMEOUT_SECONDS"
     )
+    cors_origins: str = Field(
+        default="http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173",
+        validation_alias="EDITFLOW_CORS_ORIGINS",
+    )
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
