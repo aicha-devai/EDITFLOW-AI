@@ -173,8 +173,9 @@ function renderVideoPlayer() {
     </section>`;
 }
 function seekToTimestamp(value, autoplay = true) {
+  if (!hasTimestamp(value)) return;
   const seconds = Number(value);
-  if (!Number.isFinite(seconds) || seconds < 0) return;
+  if (seconds < 0) return;
   state.pendingSeekSeconds = seconds;
   const video = $("#story-video");
   if (!video) return;
