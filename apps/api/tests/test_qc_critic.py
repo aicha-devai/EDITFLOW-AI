@@ -211,6 +211,7 @@ def test_critic_does_not_claim_multimodal_evidence_when_none_was_supplied():
     evidence = result["proposals"][0]["temporal_evidence"]
     assert evidence == {
         "transcript_segments": [],
+        "keyframes": [],
         "observations": [],
         "story_beats": [],
         "available_modalities": [],
