@@ -42,8 +42,11 @@ const relationLabels = {
 function escapeHtml(value = "") {
   return String(value).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 }
+function hasTimestamp(value) {
+  return value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value));
+}
 function fmtTime(value) {
-  if (value === null || value === undefined || !Number.isFinite(Number(value))) return "Time unavailable";
+  if (value === null || value === undefined || !hasTimestamp(value)) return "Time unavailable";
   const seconds = Math.max(0, Number(value));
   const m = Math.floor(seconds / 60);
   const s = (seconds % 60).toFixed(1).padStart(4, "0");
@@ -124,7 +127,7 @@ function renderWelcome() {
 
 function renderEvidenceTrack() {
   const items = (state.graph?.nodes || [])
-    .filter(node => node.start_seconds !== null && node.start_seconds !== undefined && Number.isFinite(Number(node.start_seconds)))
+    .filter(node => node.start_seconds !== null && node.start_seconds !== undefined && hasTimestamp(node.start_seconds))
     .sort((a,b) => Number(a.start_seconds) - Number(b.start_seconds))
     .slice(0, 160);
   if (!items.length) return `<div class="evidence-track-empty">No timestamped evidence is available for this render.</div>`;
@@ -135,10 +138,10 @@ function renderEvidenceTrack() {
   }).join("")}</div></div>`;
 }
 function findCurrentEvidence(seconds) {
-  const nodes = (state.graph?.nodes || []).filter(node => node.start_seconds !== null && node.start_seconds !== undefined && Number.isFinite(Number(node.start_seconds)));
+  const nodes = (state.graph?.nodes || []).filter(node => node.start_seconds !== null && node.start_seconds !== undefined && hasTimestamp(node.start_seconds));
   const covering = nodes.filter(node => {
     const start = Number(node.start_seconds);
-    const end = Number.isFinite(Number(node.end_seconds)) ? Number(node.end_seconds) : start;
+    const end = hasTimestamp(node.end_seconds) ? Number(node.end_seconds) : start;
     return end > start ? seconds >= start && seconds < end : Math.abs(seconds - start) <= 0.45;
   }).sort((a,b) => Number(b.start_seconds) - Number(a.start_seconds));
   return covering[0] || null;
@@ -397,7 +400,7 @@ function bindExplorer() {
     el.addEventListener("click",select);
     el.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();select();}});
   });
-  $$("[data-edge]").forEach(el=>el.addEventListener("click",()=>{const edge=state.graph.edges.find(x=>x.id===el.dataset.edge);state.selectedEdgeId=el.dataset.edge;state.selectedId=null;render();const ref=(edge?.evidence_refs||[]).map(evidenceFor).filter(Boolean).sort((a,b)=>(a.start_seconds??Infinity)-(b.start_seconds??Infinity))[0];if(ref && Number.isFinite(Number(ref.start_seconds)))seekToTimestamp(ref.start_seconds);}));
+  $$("[data-edge]").forEach(el=>el.addEventListener("click",()=>{const edge=state.graph.edges.find(x=>x.id===el.dataset.edge);state.selectedEdgeId=el.dataset.edge;state.selectedId=null;render();const ref=(edge?.evidence_refs||[]).map(evidenceFor).filter(Boolean).sort((a,b)=>(a.start_seconds??Infinity)-(b.start_seconds??Infinity))[0];if(ref && hasTimestamp(ref.start_seconds))seekToTimestamp(ref.start_seconds);}));
   $$("[data-inspect-edge]").forEach(el=>el.addEventListener("click",()=>{const edge=state.graph.edges.find(x=>x.id===el.dataset.inspectEdge);state.selectedEdgeId=el.dataset.inspectEdge;state.selectedId=null;render();const ref=(edge?.evidence_refs||[]).map(evidenceFor).filter(Boolean).sort((a,b)=>(a.start_seconds??Infinity)-(b.start_seconds??Infinity))[0];if(ref && Number.isFinite(Number(ref.start_seconds)))seekToTimestamp(ref.start_seconds);}));
   $$("[data-select-node]").forEach(el=>el.addEventListener("click",()=>{const node=evidenceFor(el.dataset.selectNode);state.selectedId=el.dataset.selectNode;state.selectedEdgeId=null;render();if(node && Number.isFinite(Number(node.start_seconds)))seekToTimestamp(node.start_seconds);}));
   $$("[data-evidence-node]").forEach(el=>el.addEventListener("click",()=>{
