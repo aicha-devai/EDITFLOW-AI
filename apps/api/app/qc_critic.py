@@ -67,6 +67,94 @@ def _clip_context(snapshot: dict[str, Any], start: float, end: float) -> list[st
     return context
 
 
+def _overlaps(start: float, end: float, other_start: Any, other_end: Any) -> bool:
+    try:
+        left, right = float(other_start), float(other_end)
+    except (TypeError, ValueError):
+        return False
+    return right > left and left < end and right > start
+
+
+def _temporal_evidence(
+    quality_report: dict[str, Any],
+    timeline_snapshot: dict[str, Any],
+    start: float,
+    end: float,
+) -> dict[str, Any]:
+    """Collect only timestamped evidence already attached to the render report."""
+    bundle = quality_report.get("evidence")
+    if not isinstance(bundle, dict):
+        bundle = {}
+
+    transcript = []
+    for item in bundle.get("transcript_segments", []):
+        if not isinstance(item, dict) or not _overlaps(
+            start, end, item.get("start_seconds"), item.get("end_seconds")
+        ):
+            continue
+        text = item.get("text")
+        if isinstance(text, str) and text.strip():
+            transcript.append({
+                "start_seconds": float(item["start_seconds"]),
+                "end_seconds": float(item["end_seconds"]),
+                "text": text.strip()[:500],
+                "source": "render_evidence.transcript_segments",
+            })
+
+    observations = []
+    for modality, key in (
+        ("visual", "visual_observations"),
+        ("audio", "audio_observations"),
+    ):
+        for item in bundle.get(key, []):
+            if not isinstance(item, dict) or not _overlaps(
+                start, end, item.get("start_seconds"), item.get("end_seconds")
+            ):
+                continue
+            description = item.get("description")
+            if isinstance(description, str) and description.strip():
+                observations.append({
+                    "modality": modality,
+                    "start_seconds": float(item["start_seconds"]),
+                    "end_seconds": float(item["end_seconds"]),
+                    "description": description.strip()[:500],
+                    "source": f"render_evidence.{key}",
+                })
+
+    beat_ids = {
+        str(clip.get("story_beat_id"))
+        for clip in timeline_snapshot.get("clips", [])
+        if clip.get("story_beat_id")
+        and _overlaps(
+            start, end,
+            clip.get("timeline_start", 0),
+            float(clip.get("timeline_start", 0))
+            + max(0.0, float(clip.get("source_out", 0)) - float(clip.get("source_in", 0))),
+        )
+    }
+    beats = []
+    sequence = timeline_snapshot.get("sequence", {})
+    beat_items = sequence.get("story_beats", []) if isinstance(sequence, dict) else []
+    for beat in beat_items:
+        if not isinstance(beat, dict) or str(beat.get("id")) not in beat_ids:
+            continue
+        beats.append({
+            "id": str(beat.get("id")),
+            "title": str(beat.get("title") or "Untitled story beat")[:160],
+        })
+
+    return {
+        "transcript_segments": transcript,
+        "observations": observations,
+        "story_beats": beats,
+        "available_modalities": sorted(
+            (["transcript"] if transcript else [])
+            + (["visual"] if any(x["modality"] == "visual" for x in observations) else [])
+            + (["audio"] if any(x["modality"] == "audio" for x in observations) else [])
+        ),
+    }
+
+
 def generate_qc_critic_proposals(
     quality_report: dict[str, Any] | None,
     timeline_snapshot: dict[str, Any],
@@ -96,6 +184,9 @@ def generate_qc_critic_proposals(
             continue
 
         local_context = _clip_context(timeline_snapshot, float(start), float(end))
+        temporal_evidence = _temporal_evidence(
+            quality_report, timeline_snapshot, float(start), float(end)
+        )
         matched_cues = []
         matched_sources = []
         for source_name, values in (
@@ -145,6 +236,7 @@ def generate_qc_critic_proposals(
             "confidence_type": "heuristic_score_not_probability",
             "matched_cues": sorted(set(matched_cues)),
             "evidence_sources": matched_sources,
+            "temporal_evidence": temporal_evidence,
             "explanation": explanation,
             "suggested_reason": reason[:300],
             "requires_user_approval": True,
