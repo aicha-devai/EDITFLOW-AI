@@ -7,7 +7,7 @@ import secrets
 import time
 from uuid import UUID
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -96,12 +96,14 @@ def decode_access_token(token: str) -> UUID:
 
 
 async def get_current_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    if credentials is None or credentials.scheme.lower() != "bearer":
+    token = credentials.credentials if credentials is not None and credentials.scheme.lower() == "bearer" else request.cookies.get("editflow_access")
+    if not token:
         raise HTTPException(401, "Authentication required", headers={"WWW-Authenticate": "Bearer"})
-    user_id = decode_access_token(credentials.credentials)
+    user_id = decode_access_token(token)
     user = await db.scalar(select(User).where(User.id == user_id, User.is_active.is_(True)))
     if user is None:
         raise HTTPException(401, "User account is unavailable", headers={"WWW-Authenticate": "Bearer"})
