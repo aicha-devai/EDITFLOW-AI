@@ -8,6 +8,10 @@ class Settings(BaseSettings):
     auth_secret: str | None = Field(default=None, validation_alias="EDITFLOW_AUTH_SECRET")
     auth_access_token_seconds: int = Field(default=900, ge=300, le=3600, validation_alias="EDITFLOW_AUTH_ACCESS_TOKEN_SECONDS")
     auth_refresh_token_days: int = Field(default=30, ge=1, le=90, validation_alias="EDITFLOW_AUTH_REFRESH_TOKEN_DAYS")
+    auth_login_limit: int = Field(default=10, ge=1, le=100, validation_alias="EDITFLOW_AUTH_LOGIN_LIMIT")
+    auth_register_limit: int = Field(default=5, ge=1, le=50, validation_alias="EDITFLOW_AUTH_REGISTER_LIMIT")
+    auth_login_window_seconds: int = Field(default=900, ge=60, le=86400, validation_alias="EDITFLOW_AUTH_LOGIN_WINDOW_SECONDS")
+    auth_register_window_seconds: int = Field(default=3600, ge=60, le=86400, validation_alias="EDITFLOW_AUTH_REGISTER_WINDOW_SECONDS")
     storage_backend: str = Field(default="local", validation_alias="EDITFLOW_STORAGE_BACKEND")
     storage_root: str = Field(default="/var/lib/editflow", validation_alias="EDITFLOW_STORAGE_ROOT")
     s3_bucket: str | None = None
