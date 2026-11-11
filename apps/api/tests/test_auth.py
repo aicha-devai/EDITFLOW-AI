@@ -432,7 +432,7 @@ async def test_invitation_is_bound_to_verified_email_and_single_use(db_session, 
 @pytest.mark.asyncio
 async def test_legacy_project_claim_is_dry_run_by_default_and_audited_on_apply(db_session):
     from app.models import Project, ProjectAuditEvent, User
-    from app.scripts.claim_legacy_project import claim_legacy_project
+    from scripts.claim_legacy_project import claim_legacy_project
 
     owner = User(email="legacy-owner@example.com", password_hash=hash_password("long enough password"), is_email_verified=True)
     project = Project(title="Imported legacy project", owner_id=None)
