@@ -41,6 +41,16 @@ The production validator rejects localhost database URLs, missing explicit datab
 5. **Database operations:** configure automated encrypted backups, retention, restore drills, least-privilege database users, migration review, and monitoring. The Compose development database credentials must never be reused in production.
 6. **Operational controls:** add security event monitoring, SMTP failure alerts, abuse monitoring, dependency/container scanning, and an incident-response contact/process. Verify account deletion/retention policy before exposing destructive account operations.
 
+## SMTP smoke test
+
+After production secrets are configured, send one message only to a mailbox controlled by the operator:
+
+```bash
+python scripts/send_test_email.py controlled-mailbox@example.com --send
+```
+
+The command refuses to send unless `--send` is present. Confirm actual inbox placement, spam placement, provider delivery logs, SPF, DKIM and DMARC alignment. A successful SMTP response alone does not guarantee inbox delivery.
+
 ## Controlled legacy ownership runbook
 
 Run from `apps/api` with a read-only inventory connection first:
