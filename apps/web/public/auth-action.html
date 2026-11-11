@@ -106,7 +106,11 @@
       try {
         const session=await post("/v1/auth/login",{email:$("email").value,password:$("login-password").value});
         const result=await post("/v1/invitations/accept",{token},session.access_token);
-        message("Invitation accepted. You now have "+result.role+" access to the project."); hide("action-form");
+        sessionStorage.setItem("editflow-access-token",session.access_token);
+        sessionStorage.setItem("editflow-refresh-token",session.refresh_token);
+        sessionStorage.setItem("editflow-user-email",session.user?.email || $("email").value);
+        message("Invitation accepted. Opening EDITFLOW AI…");
+        window.setTimeout(()=>{ location.href="/"; },900);
       } catch(error){message(error.message,true);$("primary").disabled=false;}
     });
   }
