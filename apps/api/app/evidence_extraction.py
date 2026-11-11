@@ -16,6 +16,8 @@ from typing import Any
 
 import httpx
 
+from app.scene_detection import SceneDetectionError, detect_scene_changes
+
 
 class EvidenceExtractionError(RuntimeError):
     pass
@@ -59,15 +61,20 @@ def _select_timestamps(values: list[float], duration: float, max_frames: int) ->
 
 
 async def _scene_change_timestamps(video_path: str, threshold: float, timeout_seconds: int) -> list[float]:
-    _, stderr = await _run([
-        "ffmpeg", "-hide_banner", "-nostdin", "-v", "info", "-i", video_path,
-        "-vf", f"select='gt(scene,{threshold})',showinfo", "-an", "-f", "null", "-",
-    ], timeout_seconds)
-    return [float(value) for value in re.findall(
-        r"pts_time:([0-9]+(?:\.[0-9]+)?)",
-        stderr.decode("utf-8", errors="replace"),
-    )]
-
+    """Prefer PySceneDetect; retain the existing FFmpeg detector as a safe fallback."""
+    try:
+        return await asyncio.to_thread(detect_scene_changes, video_path, threshold)
+    except SceneDetectionError:
+        # PySceneDetect may fail on an unusual codec/container. Keep evidence
+        # extraction available through the original FFmpeg scene-change filter.
+        _, stderr = await _run([
+            "ffmpeg", "-hide_banner", "-nostdin", "-v", "info", "-i", video_path,
+            "-vf", f"select='gt(scene,{threshold})',showinfo", "-an", "-f", "null", "-",
+        ], timeout_seconds)
+        return [float(value) for value in re.findall(
+            r"pts_time:([0-9]+(?:\\.[0-9]+)?)",
+            stderr.decode("utf-8", errors="replace"),
+        )]
 
 async def _perceptual_hash(image_path: str | Path) -> str | None:
     """Compute a compact 64-bit difference hash using FFmpeg only."""
