@@ -119,7 +119,7 @@ def _new_action_token(user_id: UUID, purpose: str, lifetime: timedelta):
 
 
 def _email_link(path: str, token: str) -> str:
-    return f"{settings.email_public_url.rstrip('/')}{path}?token={token}"
+    return f"{settings.email_public_url.rstrip('/')}/auth-action.html?action={path}&token={token}"
 
 
 @app.post("/v1/auth/register", status_code=202)
@@ -145,7 +145,7 @@ async def register_account(payload: AuthRegisterRequest, db: AsyncSession = Depe
         user.email,
         "Verify your EDITFLOW AI email",
         "Verify your email address using this link (valid for 24 hours):\n"
-        + _email_link("/verify-email", raw_token)
+        + _email_link("verify-email", raw_token)
         + "\nIf you did not create this account, you can ignore this message.",
     )
     return {"message": "Verification email sent. Verify your email before signing in."}
@@ -190,7 +190,7 @@ async def resend_verification(payload: EmailOnlyRequest, db: AsyncSession = Depe
         db.add(row)
         await db.commit()
         await send_email(user.email, "Verify your EDITFLOW AI email",
-            "Use this link within 24 hours:\n" + _email_link("/verify-email", raw))
+            "Use this link within 24 hours:\n" + _email_link("verify-email", raw))
     return {"message": "If the account needs verification, an email will be sent."}
 
 
@@ -209,7 +209,7 @@ async def request_password_reset(payload: EmailOnlyRequest, db: AsyncSession = D
         db.add(row)
         await db.commit()
         await send_email(user.email, "Reset your EDITFLOW AI password",
-            "Use this link within 30 minutes:\n" + _email_link("/reset-password", raw)
+            "Use this link within 30 minutes:\n" + _email_link("reset-password", raw)
             + "\nIf you did not request a reset, ignore this message.")
     return {"message": "If the account exists and is verified, a reset email will be sent."}
 
@@ -412,7 +412,7 @@ async def create_project_invitation(
         payload.email,
         "You are invited to collaborate in EDITFLOW AI",
         f"You were invited as {payload.role}. Sign in or create an account with this email, verify it, then accept the invitation using this link (valid for 7 days):\n"
-        + _email_link("/accept-invitation", raw),
+        + _email_link("accept-invitation", raw),
     )
     return {"message": "Invitation sent", "expires_in_seconds": 604800}
 
