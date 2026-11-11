@@ -27,6 +27,10 @@ services:
     restart: unless-stopped
 
   render-worker:
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Set managed PostgreSQL URL with TLS}
+      EDITFLOW_STORAGE_BACKEND: s3
+      S3_BUCKET: ${S3_BUCKET:?Set production S3 bucket}
     restart: unless-stopped
 
   web:
