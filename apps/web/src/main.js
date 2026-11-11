@@ -549,7 +549,7 @@ async function sendProjectInvitation() {
 }
 async function signOut() {
   try {
-    if(state.accessToken) await fetch(state.apiBase+"/v1/auth/logout",{method:"POST",credentials:"include",headers:cookieHeaders({"Content-Type":"application/json"}),body:"{}"});
+    if(state.accessToken) await fetch(state.apiBase+"/v1/auth/logout",{method:"POST",credentials:"include",headers:cookieHeaders({"Content-Type":"application/json"}),body:"null"});
   } finally {
     clearSession();
     if(state.mediaObjectUrl) URL.revokeObjectURL(state.mediaObjectUrl);
