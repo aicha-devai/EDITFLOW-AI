@@ -13,7 +13,7 @@ async def _register_verified_account(db_session, monkeypatch, email, password):
     monkeypatch.setattr(main, "send_email", fake_send_email)
     await main.register_account(AuthRegisterRequest(email=email, password=password), db_session)
     link = next(line for line in messages[-1].splitlines() if "token=" in line)
-    token = parse_qs(urlparse(link).query)["token"][0]
+    token = parse_qs(urlparse(link).fragment)["token"][0]
     await main.verify_email(ActionTokenRequest(token=token), db_session)
     return await main.login_account(AuthLoginRequest(email=email, password=password), db_session)
 
@@ -326,7 +326,7 @@ async def test_unverified_user_is_blocked_until_single_use_verification(db_sessi
         ), db_session)
     assert blocked.value.status_code == 403
     link = next(line for line in sent[0].splitlines() if "token=" in line)
-    token = parse_qs(urlparse(link).query)["token"][0]
+    token = parse_qs(urlparse(link).fragment)["token"][0]
     assert await main.verify_email(ActionTokenRequest(token=token), db_session) == {"verified": True}
     with pytest.raises(HTTPException) as replay:
         await main.verify_email(ActionTokenRequest(token=token), db_session)
@@ -351,7 +351,7 @@ async def test_password_reset_revokes_sessions_and_token_cannot_be_reused(db_ses
     monkeypatch.setattr(main, "send_email", fake_send_email)
     await main.request_password_reset(EmailOnlyRequest(email="reset-user@example.com"), db_session)
     link = next(line for line in sent[0].splitlines() if "token=" in line)
-    token = parse_qs(urlparse(link).query)["token"][0]
+    token = parse_qs(urlparse(link).fragment)["token"][0]
     assert await main.reset_password(
         PasswordResetRequest(token=token, new_password="new secure password"),
         db_session,
@@ -407,7 +407,7 @@ async def test_invitation_is_bound_to_verified_email_and_single_use(db_session, 
     )
     assert sent[0][0] == invitee.email
     link = next(line for line in sent[0][1].splitlines() if "token=" in line)
-    token = parse_qs(urlparse(link).query)["token"][0]
+    token = parse_qs(urlparse(link).fragment)["token"][0]
     with pytest.raises(HTTPException) as mismatch:
         await main.accept_project_invitation(
             ActionTokenRequest(token=token), db_session, current_user=impostor
