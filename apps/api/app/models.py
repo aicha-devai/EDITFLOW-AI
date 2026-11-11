@@ -14,6 +14,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(320), nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    is_email_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="true")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
@@ -138,4 +139,37 @@ class ProjectAuditEvent(Base):
     action: Mapped[str] = mapped_column(String(40), nullable=False)
     previous_role: Mapped[str | None] = mapped_column(String(20))
     new_role: Mapped[str | None] = mapped_column(String(20))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class AuthActionToken(Base):
+    __tablename__ = "auth_action_tokens"
+    __table_args__ = (
+        UniqueConstraint("token_hash", name="uq_auth_action_token_hash"),
+        CheckConstraint("purpose IN ('email_verification','password_reset')", name="ck_auth_action_token_purpose"),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    purpose: Mapped[str] = mapped_column(String(32), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class ProjectInvitation(Base):
+    __tablename__ = "project_invitations"
+    __table_args__ = (
+        CheckConstraint("role IN ('editor','viewer')", name="ck_project_invitation_role"),
+        UniqueConstraint("token_hash", name="uq_project_invitation_token_hash"),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    inviter_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    invited_email: Mapped[str] = mapped_column(String(320), nullable=False, index=True)
+    role: Mapped[str] = mapped_column(String(20), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
