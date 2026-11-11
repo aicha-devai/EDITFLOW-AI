@@ -10,3 +10,4 @@ htmlcov/
 dist/
 build/
 *.egg-info/
+\n# Local database backup archives and metadata must never be committed\nbackups/\napps/api/backups/\n
