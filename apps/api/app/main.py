@@ -295,6 +295,7 @@ async def get_story_continuity_graph(project_id: UUID, job_id: UUID, db: AsyncSe
 async def approve_qc_critic_suggestions(
     project_id: UUID, job_id: UUID, payload: QCCriticApprovalRequest,
     db: AsyncSession = Depends(get_db),
+    _owned_project: Project = Depends(require_owned_project),
 ):
     try:
         async with db.begin():
