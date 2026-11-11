@@ -7,7 +7,7 @@ This review reflects repository code and CI evidence only. It does not assert th
 ## Implemented in the repository
 
 - Production startup validation fails closed unless a 32+ character auth secret, explicit HTTPS frontend origin, explicit HTTPS CORS origins, authenticated TLS SMTP, a non-local database, and S3-compatible storage are configured.
-- SMTP refuses plaintext transport and incomplete username/password pairs.
+- SMTP refuses plaintext transport and incomplete username/password pairs; SSL and STARTTLS use the system CA trust store for certificate verification.
 - Verification and password-reset tokens are invalidated if delivery fails, rather than remaining live with no delivered link.
 - New invitations revoke prior unaccepted invitations for the same project and email; invitation creation is rate-limited by project, recipient, and request IP.
 - Registration responses no longer disclose whether an email already has an account.
