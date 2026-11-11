@@ -132,9 +132,11 @@ async def register_account(payload: AuthRegisterRequest, db: AsyncSession = Depe
     if existing is not None:
         raise HTTPException(409, "An account with this email already exists")
     user = User(email=payload.email, password_hash=hash_password(payload.password), is_email_verified=False)
-    raw_token, token_row = _new_action_token(user.id, "email_verification", timedelta(hours=24))
-    db.add_all([user, token_row])
+    db.add(user)
     try:
+        await db.flush()
+        raw_token, token_row = _new_action_token(user.id, "email_verification", timedelta(hours=24))
+        db.add(token_row)
         await db.commit()
     except IntegrityError:
         await db.rollback()
