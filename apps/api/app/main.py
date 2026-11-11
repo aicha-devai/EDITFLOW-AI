@@ -9,7 +9,7 @@ from app.db import get_db
 from app.rendering import create_render_job, get_render_job, request_render_cancellation, RenderJobNotFound
 from sqlalchemy import select, or_, delete, update
 from sqlalchemy.exc import IntegrityError
-from app.models import Project, RenderJob, User, ProjectMember, UserSession
+from app.models import Project, RenderJob, User, ProjectMember, UserSession, ProjectAuditEvent
 from app.schemas import (
     ProjectCreate, SaveTimelineRequest, RestoreRequest, CreateRenderRequest,
     QCCriticApprovalRequest, AuthRegisterRequest, AuthLoginRequest, ProjectMemberUpsert, RefreshTokenRequest,
@@ -255,6 +255,30 @@ async def list_project_members(
     return result
 
 
+@app.get("/v1/projects/{project_id}/audit-log")
+async def list_project_audit_events(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    _owned_project: Project = Depends(require_owned_project),
+):
+    events = (await db.execute(
+        select(ProjectAuditEvent)
+        .where(ProjectAuditEvent.project_id == project_id)
+        .order_by(ProjectAuditEvent.created_at.desc(), ProjectAuditEvent.id.desc())
+    )).scalars().all()
+    return [{
+        "id": str(event.id),
+        "actor_user_id": str(event.actor_user_id) if event.actor_user_id else None,
+        "actor_email": event.actor_email,
+        "target_user_id": str(event.target_user_id) if event.target_user_id else None,
+        "target_email": event.target_email,
+        "action": event.action,
+        "previous_role": event.previous_role,
+        "new_role": event.new_role,
+        "created_at": event.created_at,
+    } for event in events]
+
+
 @app.post("/v1/projects/{project_id}/members", status_code=200)
 async def upsert_project_member(
     project_id: UUID,
@@ -262,6 +286,7 @@ async def upsert_project_member(
     db: AsyncSession = Depends(get_db),
     _owned_project: Project = Depends(require_owned_project),
 ):
+    owner = await db.scalar(select(User).where(User.id == _owned_project.owner_id))
     user = await db.scalar(select(User).where(User.email == payload.email, User.is_active.is_(True)))
     if user is None:
         raise HTTPException(404, "An active account with this email was not found")
@@ -271,11 +296,27 @@ async def upsert_project_member(
         ProjectMember.project_id == project_id,
         ProjectMember.user_id == user.id,
     ))
+    previous_role = member.role if member is not None else None
     if member is None:
         member = ProjectMember(project_id=project_id, user_id=user.id, role=payload.role)
         db.add(member)
-    else:
+        action = "member.added"
+    elif member.role != payload.role:
         member.role = payload.role
+        action = "member.role_changed"
+    else:
+        action = None
+    if action is not None:
+        db.add(ProjectAuditEvent(
+            project_id=project_id,
+            actor_user_id=_owned_project.owner_id,
+            actor_email=owner.email if owner else "unknown",
+            target_user_id=user.id,
+            target_email=user.email,
+            action=action,
+            previous_role=previous_role,
+            new_role=payload.role,
+        ))
     await db.commit()
     await db.refresh(member)
     return {"user_id": str(user.id), "email": user.email, "role": member.role}
@@ -288,12 +329,27 @@ async def remove_project_member(
     db: AsyncSession = Depends(get_db),
     _owned_project: Project = Depends(require_owned_project),
 ):
-    result = await db.execute(delete(ProjectMember).where(
+    owner = await db.scalar(select(User).where(User.id == _owned_project.owner_id))
+    member = await db.scalar(select(ProjectMember).where(
         ProjectMember.project_id == project_id,
         ProjectMember.user_id == member_user_id,
     ))
-    if result.rowcount == 0:
+    if member is None:
         raise HTTPException(404, "Project member not found")
+    target = await db.scalar(select(User).where(User.id == member_user_id))
+    if target is None:
+        raise HTTPException(404, "Project member not found")
+    db.add(ProjectAuditEvent(
+        project_id=project_id,
+        actor_user_id=_owned_project.owner_id,
+        actor_email=owner.email if owner else "unknown",
+        target_user_id=target.id,
+        target_email=target.email,
+        action="member.removed",
+        previous_role=member.role,
+        new_role=None,
+    ))
+    await db.delete(member)
     await db.commit()
     return None
 
