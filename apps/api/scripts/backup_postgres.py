@@ -11,11 +11,34 @@ import shutil
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import parse_qs, unquote, urlsplit
 
 
-def run(command: list[str]) -> str:
-    completed = subprocess.run(command, check=True, capture_output=True, text=True)
-    return completed.stdout
+def connection_environment(database_url: str) -> dict[str, str]:
+    parsed = urlsplit(database_url.replace("postgresql+asyncpg://", "postgresql://", 1))
+    if not parsed.hostname or not parsed.path.strip("/"):
+        raise ValueError("DATABASE_URL must include a database host and name")
+    query = parse_qs(parsed.query)
+    env = os.environ.copy()
+    env.update({
+        "PGHOST": parsed.hostname,
+        "PGPORT": str(parsed.port or 5432),
+        "PGDATABASE": unquote(parsed.path.lstrip("/")),
+        "PGSSLMODE": (query.get("sslmode") or query.get("ssl") or ["require"])[0],
+    })
+    if parsed.username:
+        env["PGUSER"] = unquote(parsed.username)
+    if parsed.password:
+        env["PGPASSWORD"] = unquote(parsed.password)
+    return env
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def main() -> None:
@@ -34,11 +57,15 @@ def main() -> None:
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     archive = output_dir / f"editflow-{stamp}.dump"
     metadata = archive.with_suffix(".json")
+    env = connection_environment(database_url)
 
     try:
-        run(["pg_dump", "--format=custom", "--no-owner", "--no-acl", "--file", str(archive), database_url])
-        run(["pg_restore", "--list", str(archive)])
-        digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+        subprocess.run(
+            ["pg_dump", "--format=custom", "--no-owner", "--no-acl", "--file", str(archive)],
+            env=env, check=True,
+        )
+        subprocess.run(["pg_restore", "--list", str(archive)], check=True, capture_output=True, text=True)
+        digest = sha256_file(archive)
         metadata.write_text(json.dumps({
             "created_at": stamp,
             "format": "postgres-custom",
