@@ -487,3 +487,43 @@ async def test_legacy_project_claim_refuses_unverified_or_already_owned_accounts
         await claim_legacy_project(db_session, owned.id, existing_owner.email, "ops-1", "No overwrite", apply=True)
     await db_session.refresh(unowned)
     assert unowned.owner_id is None
+
+
+
+@pytest.mark.asyncio
+async def test_failed_action_email_invalidates_undelivered_token(db_session, monkeypatch):
+    from datetime import datetime, timedelta, timezone
+    from sqlalchemy import select
+    import app.main as main
+    from app.models import AuthActionToken, User
+
+    user = User(
+        email="mail-failure@example.com",
+        password_hash=hash_password("a sufficiently long test password"),
+        is_email_verified=True,
+    )
+    db_session.add(user)
+    await db_session.flush()
+    token = AuthActionToken(
+        user_id=user.id,
+        purpose="password_reset",
+        token_hash="b" * 64,
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=30),
+    )
+    db_session.add(token)
+    await db_session.commit()
+    token_id = token.id
+
+    async def fail_delivery(*args, **kwargs):
+        raise RuntimeError("simulated SMTP outage")
+
+    monkeypatch.setattr(main, "send_email", fail_delivery)
+    with pytest.raises(RuntimeError, match="SMTP outage"):
+        await main._send_action_email(
+            db_session, token, user.email, "Password reset", "One-time link"
+        )
+
+    stored = await db_session.scalar(
+        select(AuthActionToken).where(AuthActionToken.id == token_id)
+    )
+    assert stored.consumed_at is not None
