@@ -120,6 +120,15 @@ function render() {
         <label>PASSWORD<input id="account-password" type="password" autocomplete="current-password"></label>
         <button id="account-login" class="primary-button full">Sign in</button>
         <button id="account-register" class="secondary-button full">Create account</button>
+        <div class="account-links"><button id="password-reset-request" class="text-button" type="button">Forgot password?</button><button id="verification-resend" class="text-button" type="button">Resend verification email</button></div>
+        <div class="collaboration-panel">
+          <div class="modal-head"><div><span class="eyebrow">COLLABORATION</span><h2>Invite to a project</h2></div></div>
+          <label>PROJECT ID<input id="invite-project-id" value="${escapeHtml(state.projectId)}" placeholder="Project UUID"></label>
+          <label>INVITEE EMAIL<input id="invite-email" type="email" autocomplete="email" placeholder="teammate@example.com"></label>
+          <label>ACCESS ROLE<select id="invite-role"><option value="editor">Editor — can edit</option><option value="viewer">Viewer — read only</option></select></label>
+          <button id="send-invitation" class="secondary-button full" type="button" ${state.accessToken ? "" : "disabled"}>Send invitation</button>
+          <p class="muted">Only the project owner can invite. The invitation expires after 7 days.</p>
+        </div>
         <button id="account-logout" class="icon-button full" ${state.accessToken ? "" : "disabled"}>Sign out</button>
         <p id="account-message" class="muted" role="status"></p>
         <p class="muted">New accounts must verify their email before signing in. Access and refresh tokens are kept in this browser tab session.</p>
@@ -431,6 +440,9 @@ function bindShell() {
   $("#account-btn")?.addEventListener("click",()=>$("#settings-modal").classList.remove("hidden"));
   $("#account-login")?.addEventListener("click", signIn);
   $("#account-register")?.addEventListener("click", registerAccount);
+  $("#password-reset-request")?.addEventListener("click", requestPasswordReset);
+  $("#verification-resend")?.addEventListener("click", resendVerificationEmail);
+  $("#send-invitation")?.addEventListener("click", sendProjectInvitation);
   $("#account-logout")?.addEventListener("click", signOut);
   $("#close-settings")?.addEventListener("click",()=>$("#settings-modal").classList.add("hidden"));
   $("#settings-modal")?.addEventListener("click",e=>{if(e.target.id==="settings-modal") e.currentTarget.classList.add("hidden");});
@@ -486,6 +498,43 @@ async function registerAccount() {
     if(!response.ok) throw new Error(body.detail || "Registration failed");
     accountMessage("Verification email sent. Verify your email, then sign in here.");
   } catch(error) { accountMessage(error.message || "Could not create account.",true); }
+}
+async function requestPasswordReset() {
+  const email=$("#account-email")?.value.trim();
+  if(!email) return accountMessage("Enter your account email first.",true);
+  try {
+    const response=await fetch(state.apiBase+"/v1/auth/request-password-reset",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email})});
+    const body=await response.json().catch(()=>({}));
+    if(!response.ok) throw new Error(body.detail || "Could not request password reset.");
+    accountMessage(body.message || "If the account exists and is verified, a reset email will be sent.");
+  } catch(error) { accountMessage(error.message || "Could not request password reset.",true); }
+}
+async function resendVerificationEmail() {
+  const email=$("#account-email")?.value.trim();
+  if(!email) return accountMessage("Enter your account email first.",true);
+  try {
+    const response=await fetch(state.apiBase+"/v1/auth/resend-verification",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email})});
+    const body=await response.json().catch(()=>({}));
+    if(!response.ok) throw new Error(body.detail || "Could not resend verification email.");
+    accountMessage(body.message || "If the account needs verification, a new email will be sent.");
+  } catch(error) { accountMessage(error.message || "Could not resend verification email.",true); }
+}
+async function sendProjectInvitation() {
+  const projectId=$("#invite-project-id")?.value.trim();
+  const email=$("#invite-email")?.value.trim();
+  const role=$("#invite-role")?.value || "viewer";
+  if(!projectId || !email) return accountMessage("Enter both the project ID and invitee email.",true);
+  const button=$("#send-invitation");
+  if(button) button.disabled=true;
+  try {
+    const response=await authorizedFetch(state.apiBase.replace(/\/$/,"")+"/v1/projects/"+encodeURIComponent(projectId)+"/invitations",{
+      method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,role})
+    });
+    const body=await response.json().catch(()=>({}));
+    if(!response.ok) throw new Error(body.detail || "Could not send invitation.");
+    accountMessage("Invitation email sent. It expires in 7 days.");
+  } catch(error) { accountMessage(error.message || "Could not send invitation.",true); }
+  finally { if(button) button.disabled=!state.accessToken; }
 }
 async function signOut() {
   try {
