@@ -6,7 +6,7 @@ from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.config import settings
+from app.config import settings, validate_production_settings
 from app.db import get_db
 from app.rendering import create_render_job, get_render_job, request_render_cancellation, RenderJobNotFound
 from sqlalchemy import select, or_, delete, update
@@ -31,6 +31,26 @@ from app.rate_limit import enforce_rate_limit
 from app.emailer import send_email
 
 app = FastAPI(title=settings.api_title, version="0.1.0")
+
+
+@app.on_event("startup")
+async def validate_runtime_configuration():
+    validate_production_settings()
+
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    if request.url.path.startswith("/v1/auth/") or request.url.path.startswith("/v1/invitations/"):
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["Pragma"] = "no-cache"
+    return response
+
+
 _allowed_origins = [origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()]
 app.add_middleware(
     CORSMiddleware,
@@ -121,6 +141,18 @@ def _new_action_token(user_id: UUID, purpose: str, lifetime: timedelta):
 def _email_link(path: str, token: str) -> str:
     return f"{settings.email_public_url.rstrip('/')}/auth-action.html?action={path}&token={token}"
 
+async def _send_action_email(db: AsyncSession, token_row: AuthActionToken, recipient: str, subject: str, body: str) -> None:
+    try:
+        await send_email(recipient, subject, body)
+    except Exception:
+        # Do not leave a valid but undelivered verification/reset link in the database.
+        await db.execute(update(AuthActionToken).where(
+            AuthActionToken.id == token_row.id,
+            AuthActionToken.consumed_at.is_(None),
+        ).values(consumed_at=datetime.now(timezone.utc)))
+        await db.commit()
+        raise
+
 
 @app.post("/v1/auth/register", status_code=202)
 async def register_account(payload: AuthRegisterRequest, db: AsyncSession = Depends(get_db), request: Request = None):
@@ -141,8 +173,8 @@ async def register_account(payload: AuthRegisterRequest, db: AsyncSession = Depe
     except IntegrityError:
         await db.rollback()
         raise HTTPException(409, "An account with this email already exists")
-    await send_email(
-        user.email,
+    await _send_action_email(
+        db, token_row, user.email,
         "Verify your EDITFLOW AI email",
         "Verify your email address using this link (valid for 24 hours):\n"
         + _email_link("verify-email", raw_token)
@@ -189,7 +221,7 @@ async def resend_verification(payload: EmailOnlyRequest, db: AsyncSession = Depe
         raw, row = _new_action_token(user.id, "email_verification", timedelta(hours=24))
         db.add(row)
         await db.commit()
-        await send_email(user.email, "Verify your EDITFLOW AI email",
+        await _send_action_email(db, row, user.email, "Verify your EDITFLOW AI email",
             "Use this link within 24 hours:\n" + _email_link("verify-email", raw))
     return {"message": "If the account needs verification, an email will be sent."}
 
@@ -208,7 +240,7 @@ async def request_password_reset(payload: EmailOnlyRequest, db: AsyncSession = D
         raw, row = _new_action_token(user.id, "password_reset", timedelta(minutes=30))
         db.add(row)
         await db.commit()
-        await send_email(user.email, "Reset your EDITFLOW AI password",
+        await _send_action_email(db, row, user.email, "Reset your EDITFLOW AI password",
             "Use this link within 30 minutes:\n" + _email_link("reset-password", raw)
             + "\nIf you did not request a reset, ignore this message.")
     return {"message": "If the account exists and is verified, a reset email will be sent."}
@@ -393,10 +425,27 @@ async def create_project_invitation(
     project_id: UUID,
     payload: ProjectInvitationCreate,
     db: AsyncSession = Depends(get_db),
+    request: Request = None,
     _owned_project: Project = Depends(require_owned_project),
 ):
+    client_ip = request.client.host if request and request.client else "unknown"
+    await enforce_rate_limit(
+        db,
+        [f"invite:project:{project_id}", f"invite:recipient:{payload.email}", f"invite:ip:{client_ip}"],
+        10,
+        3600,
+    )
     if payload.email == (await db.scalar(select(User.email).where(User.id == _owned_project.owner_id))):
         raise HTTPException(409, "The project owner already has full access")
+    now = datetime.now(timezone.utc)
+    # A new invitation replaces older unaccepted invitations for this project/email.
+    await db.execute(update(ProjectInvitation).where(
+        ProjectInvitation.project_id == project_id,
+        ProjectInvitation.invited_email == payload.email,
+        ProjectInvitation.accepted_at.is_(None),
+        ProjectInvitation.revoked_at.is_(None),
+        ProjectInvitation.expires_at > now,
+    ).values(revoked_at=now))
     raw = secrets.token_urlsafe(40)
     invitation = ProjectInvitation(
         project_id=project_id,
@@ -404,16 +453,21 @@ async def create_project_invitation(
         invited_email=payload.email,
         role=payload.role,
         token_hash=hashlib.sha256(raw.encode("utf-8")).hexdigest(),
-        expires_at=datetime.now(timezone.utc) + timedelta(days=7),
+        expires_at=now + timedelta(days=7),
     )
     db.add(invitation)
     await db.commit()
-    await send_email(
-        payload.email,
-        "You are invited to collaborate in EDITFLOW AI",
-        f"You were invited as {payload.role}. Sign in or create an account with this email, verify it, then accept the invitation using this link (valid for 7 days):\n"
-        + _email_link("accept-invitation", raw),
-    )
+    try:
+        await send_email(
+            payload.email,
+            "You are invited to collaborate in EDITFLOW AI",
+            f"You were invited as {payload.role}. Sign in or create an account with this email, verify it, then accept the invitation using this link (valid for 7 days):\n"
+            + _email_link("accept-invitation", raw),
+        )
+    except Exception:
+        invitation.revoked_at = datetime.now(timezone.utc)
+        await db.commit()
+        raise
     return {"message": "Invitation sent", "expires_in_seconds": 604800}
 
 
