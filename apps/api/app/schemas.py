@@ -11,7 +11,7 @@ class AuthRegisterRequest(BaseModel):
     @model_validator(mode="after")
     def normalize_and_validate_email(self):
         normalized = self.email.strip().lower()
-        if not re.fullmatch(r"[^\\s@]+@[^\\s@]+\\.[^\\s@]+", normalized):
+        if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", normalized):
             raise ValueError("A valid email address is required")
         self.email = normalized
         return self
