@@ -15,6 +15,7 @@ from app.models import Project, RenderJob, User, ProjectMember, UserSession, Pro
 from app.schemas import (
     ProjectCreate, SaveTimelineRequest, RestoreRequest, CreateRenderRequest,
     QCCriticApprovalRequest, AuthRegisterRequest, AuthLoginRequest, ProjectMemberUpsert, RefreshTokenRequest,
+    EmailOnlyRequest, ActionTokenRequest, PasswordResetRequest, ProjectInvitationCreate,
 )
 from app.qc_critic import (
     generate_qc_critic_proposals, approve_qc_intent_proposals,
