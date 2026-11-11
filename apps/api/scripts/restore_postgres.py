@@ -1,7 +1,7 @@
-"""Restore a verified custom-format backup to an explicitly named restore database.
+"""Restore an encrypted, verified PostgreSQL backup to an isolated restore database.
 
-This is destructive to objects in the target database. The target database name must
-contain 'restore' or 'drill'. Never point this command at the live production database.
+Requires an age identity file. The target database name must contain 'restore' or
+'drill'; the restore is destructive to objects in that target.
 """
 import argparse
 import hashlib
@@ -9,6 +9,7 @@ import json
 import os
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlsplit
 
@@ -47,6 +48,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("archive", type=Path)
     parser.add_argument("--target-database-url", default=os.environ.get("RESTORE_DATABASE_URL"))
+    parser.add_argument("--identity-file", default=os.environ.get("AGE_IDENTITY_FILE"))
     parser.add_argument("--allow-overwrite", action="store_true", help="Required: restore drops/replaces objects in the target database")
     args = parser.parse_args()
 
@@ -54,28 +56,44 @@ def main() -> None:
         parser.error("Refusing destructive restore without --allow-overwrite")
     if not args.target_database_url:
         parser.error("Set RESTORE_DATABASE_URL to a dedicated, isolated restore database")
+    if not args.identity_file or not Path(args.identity_file).is_file():
+        parser.error("Set AGE_IDENTITY_FILE to the protected age identity file")
     if not args.archive.is_file():
-        parser.error("Backup archive does not exist")
-    if not shutil.which("pg_restore"):
-        parser.error("pg_restore is required on PATH")
+        parser.error("Encrypted backup archive does not exist")
+    for binary in ("age", "pg_restore"):
+        if not shutil.which(binary):
+            parser.error(f"{binary} is required on PATH")
 
     try:
         env = connection_environment(args.target_database_url)
     except ValueError as exc:
         parser.error(str(exc))
-    metadata_path = args.archive.with_suffix(".json")
+    metadata_path = args.archive.with_suffix("").with_suffix(".json")
     if not metadata_path.is_file():
         parser.error("Backup metadata/checksum file is missing")
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-    if sha256_file(args.archive) != metadata.get("sha256") or metadata.get("verified") is not True:
-        parser.error("Backup checksum or verification metadata is invalid")
+    if metadata.get("encrypted") is not True or metadata.get("verified") is not True:
+        parser.error("Backup metadata does not mark an encrypted, verified archive")
+    if sha256_file(args.archive) != metadata.get("sha256"):
+        parser.error("Encrypted backup checksum is invalid")
 
-    subprocess.run(["pg_restore", "--list", str(args.archive)], check=True, capture_output=True, text=True)
-    subprocess.run([
-        "pg_restore", "--clean", "--if-exists", "--no-owner", "--no-acl",
-        "--exit-on-error", "--dbname", env["PGDATABASE"], str(args.archive),
-    ], env=env, check=True)
-    print(json.dumps({"restored": True, "archive": str(args.archive), "checksum_verified": True, "target_database": env["PGDATABASE"]}))
+    fd, temporary_name = tempfile.mkstemp(prefix="editflow-restore-", suffix=".dump")
+    os.close(fd)
+    plaintext = Path(temporary_name)
+    try:
+        os.chmod(plaintext, 0o600)
+        subprocess.run([
+            "age", "--decrypt", "--identity", args.identity_file,
+            "--output", str(plaintext), str(args.archive),
+        ], check=True)
+        subprocess.run(["pg_restore", "--list", str(plaintext)], check=True, capture_output=True, text=True)
+        subprocess.run([
+            "pg_restore", "--clean", "--if-exists", "--no-owner", "--no-acl",
+            "--exit-on-error", "--dbname", env["PGDATABASE"], str(plaintext),
+        ], env=env, check=True)
+        print(json.dumps({"restored": True, "archive": str(args.archive), "checksum_verified": True, "decrypted": True, "target_database": env["PGDATABASE"]}))
+    finally:
+        plaintext.unlink(missing_ok=True)
 
 
 if __name__ == "__main__":
