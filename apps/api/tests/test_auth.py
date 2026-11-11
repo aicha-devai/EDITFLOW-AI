@@ -445,7 +445,7 @@ async def test_legacy_project_claim_is_dry_run_by_default_and_audited_on_apply(d
         db_session, project_id, owner_email, "ops-ticket-42", "Customer ownership verified from original invoice", apply=False
     )
     assert preview["dry_run"] is True
-    await db_session.refresh(project)
+    project = await db_session.scalar(__import__("sqlalchemy").select(Project).where(Project.id == project_id))
     assert project.owner_id is None
 
     applied = await claim_legacy_project(
@@ -469,7 +469,7 @@ async def test_legacy_project_claim_is_dry_run_by_default_and_audited_on_apply(d
 @pytest.mark.asyncio
 async def test_legacy_project_claim_refuses_unverified_or_already_owned_accounts(db_session):
     from app.models import Project, User
-    from app.scripts.claim_legacy_project import claim_legacy_project
+    from scripts.claim_legacy_project import claim_legacy_project
 
     unverified = User(email="unverified-legacy@example.com", password_hash=hash_password("long enough password"), is_email_verified=False)
     existing_owner = User(email="existing-owner@example.com", password_hash=hash_password("long enough password"), is_email_verified=True)
