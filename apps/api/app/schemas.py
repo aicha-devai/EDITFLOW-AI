@@ -26,6 +26,19 @@ class AuthLoginRequest(BaseModel):
         self.email = self.email.strip().lower()
         return self
 
+class ProjectMemberUpsert(BaseModel):
+    email: str = Field(min_length=5, max_length=320)
+    role: Literal["editor", "viewer"]
+
+    @model_validator(mode="after")
+    def normalize_and_validate_email(self):
+        normalized = self.email.strip().lower()
+        if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", normalized):
+            raise ValueError("A valid email address is required")
+        self.email = normalized
+        return self
+
+
 class ProjectCreate(BaseModel):
     title: str = Field(min_length=1, max_length=200)
 
