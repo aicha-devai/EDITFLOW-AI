@@ -1,7 +1,30 @@
 from typing import Any, Literal
+import re
 from uuid import UUID
 from pydantic import BaseModel, Field, ConfigDict, model_validator
 
+
+class AuthRegisterRequest(BaseModel):
+    email: str = Field(min_length=5, max_length=320)
+    password: str = Field(min_length=12, max_length=128)
+
+    @model_validator(mode="after")
+    def normalize_and_validate_email(self):
+        normalized = self.email.strip().lower()
+        if not re.fullmatch(r"[^\\s@]+@[^\\s@]+\\.[^\\s@]+", normalized):
+            raise ValueError("A valid email address is required")
+        self.email = normalized
+        return self
+
+
+class AuthLoginRequest(BaseModel):
+    email: str = Field(min_length=5, max_length=320)
+    password: str = Field(min_length=1, max_length=128)
+
+    @model_validator(mode="after")
+    def normalize_email(self):
+        self.email = self.email.strip().lower()
+        return self
 
 class ProjectCreate(BaseModel):
     title: str = Field(min_length=1, max_length=200)
