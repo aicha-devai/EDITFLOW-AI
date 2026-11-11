@@ -481,7 +481,6 @@ async def upload_project_video(project_id: UUID, file: UploadFile = File(...),
             width=info.width, height=info.height,
         )
         db.add(asset)
-        await db.flush()
         latest = None
         if project.current_version_id:
             latest = await db.scalar(select(TimelineVersion).where(
@@ -505,12 +504,12 @@ async def upload_project_video(project_id: UUID, file: UploadFile = File(...),
             "qc_intent": (latest.timeline_json.get("qc_intent", []) if latest else []),
         }
         timeline = TimelineDocument.model_validate(timeline_data)
-        async with db.begin():
-            version, created = await save_timeline(
-                db, project_id, timeline, latest.version if latest else 0,
-                message=f"Added source video: {safe_name}",
-                idempotency_key=f"upload-{asset_id}",
-            )
+        version, created = await save_timeline(
+            db, project_id, timeline, latest.version if latest else 0,
+            message=f"Added source video: {safe_name}",
+            idempotency_key=f"upload-{asset_id}",
+        )
+        await db.commit()
         return {
             "asset": {
                 "id": str(asset.id), "original_filename": asset.original_filename,
