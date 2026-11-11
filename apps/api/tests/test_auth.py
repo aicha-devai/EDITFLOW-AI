@@ -244,3 +244,36 @@ async def test_logout_revokes_refresh_session_family(db_session, monkeypatch):
             db_session,
         )
     assert revoked.value.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_auth_rate_limit_is_persistent_and_returns_retry_after(db_session, monkeypatch):
+    from app.config import settings
+    from app.rate_limit import enforce_rate_limit
+    from app.models import RateLimitBucket
+    from sqlalchemy import select
+    from fastapi import HTTPException
+
+    monkeypatch.setattr(settings, "auth_secret", "test-secret-that-is-long-enough-for-hmac-256")
+    await enforce_rate_limit(db_session, ["login:ip:203.0.113.10"], 2, 900)
+    await enforce_rate_limit(db_session, ["login:ip:203.0.113.10"], 2, 900)
+
+    with pytest.raises(HTTPException) as limited:
+        await enforce_rate_limit(db_session, ["login:ip:203.0.113.10"], 2, 900)
+    assert limited.value.status_code == 429
+    assert int(limited.value.headers["Retry-After"]) > 0
+
+    rows = (await db_session.execute(select(RateLimitBucket))).scalars().all()
+    assert len(rows) == 1
+    assert rows[0].scope_key != "login:ip:203.0.113.10"
+    assert rows[0].request_count == 3
+
+
+@pytest.mark.asyncio
+async def test_auth_rate_limits_are_isolated_by_scope(db_session, monkeypatch):
+    from app.config import settings
+    from app.rate_limit import enforce_rate_limit
+
+    monkeypatch.setattr(settings, "auth_secret", "test-secret-that-is-long-enough-for-hmac-256")
+    await enforce_rate_limit(db_session, ["login:ip:203.0.113.11"], 1, 900)
+    await enforce_rate_limit(db_session, ["login:ip:203.0.113.12"], 1, 900)
