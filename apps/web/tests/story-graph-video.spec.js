@@ -158,3 +158,46 @@ test("untimed relationship evidence has no jump control and does not move playba
   await expect.poll(() => video.evaluate(el => el.currentTime)).toBe(8.5);
   await expect(page.locator(".evidence-card .evidence-time")).toContainText("Time unavailable");
 });
+
+
+test("account panel exposes password recovery and sends a reset request", async ({ page }) => {
+  await page.route("**/v1/auth/request-password-reset", async route => {
+    expect(route.request().method()).toBe("POST");
+    expect(route.request().postDataJSON()).toEqual({ email: "member@example.com" });
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
+      message: "If the account exists and is verified, a reset email will be sent.",
+    }) });
+  });
+  await page.goto("/");
+  await page.locator("#account-btn").click();
+  await page.locator("#account-email").fill("member@example.com");
+  await page.locator("#password-reset-request").click();
+  await expect(page.locator("#account-message")).toContainText("reset email will be sent");
+});
+
+test("account panel exposes resend verification and owner invitation controls", async ({ page }) => {
+  await page.addInitScript(() => {
+    sessionStorage.setItem("editflow-access-token", "test-access-token");
+    sessionStorage.setItem("editflow-refresh-token", "test-refresh-token");
+    sessionStorage.setItem("editflow-user-email", "owner@example.com");
+  });
+  await page.route("**/v1/auth/resend-verification", async route => {
+    expect(route.request().postDataJSON()).toEqual({ email: "owner@example.com" });
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ message: "Verification email queued." }) });
+  });
+  await page.route("**/v1/projects/*/invitations", async route => {
+    expect(route.request().method()).toBe("POST");
+    expect(route.request().headers()["authorization"]).toBe("Bearer test-access-token");
+    expect(route.request().postDataJSON()).toEqual({ email: "editor@example.com", role: "editor" });
+    await route.fulfill({ status: 202, contentType: "application/json", body: JSON.stringify({ message: "Invitation sent", expires_in_seconds: 604800 }) });
+  });
+  await page.goto("/");
+  await page.locator("#account-btn").click();
+  await page.locator("#verification-resend").click();
+  await expect(page.locator("#account-message")).toContainText("Verification email queued");
+  await page.locator("#invite-project-id").fill(projectId);
+  await page.locator("#invite-email").fill("editor@example.com");
+  await page.locator("#invite-role").selectOption("editor");
+  await page.locator("#send-invitation").click();
+  await expect(page.locator("#account-message")).toContainText("Invitation email sent");
+});
