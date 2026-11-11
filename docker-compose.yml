@@ -18,7 +18,17 @@ services:
     build:
       context: ./apps/api
     environment:
-      DATABASE_URL: postgresql+asyncpg://editflow:editflow@postgres:5432/editflow
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://editflow:editflow@postgres:5432/editflow}
+      EDITFLOW_ENV: ${EDITFLOW_ENV:-development}
+      EDITFLOW_AUTH_SECRET: ${EDITFLOW_AUTH_SECRET:-}
+      EDITFLOW_EMAIL_SMTP_HOST: ${EDITFLOW_EMAIL_SMTP_HOST:-}
+      EDITFLOW_EMAIL_SMTP_PORT: ${EDITFLOW_EMAIL_SMTP_PORT:-587}
+      EDITFLOW_EMAIL_SMTP_USERNAME: ${EDITFLOW_EMAIL_SMTP_USERNAME:-}
+      EDITFLOW_EMAIL_SMTP_PASSWORD: ${EDITFLOW_EMAIL_SMTP_PASSWORD:-}
+      EDITFLOW_EMAIL_FROM: ${EDITFLOW_EMAIL_FROM:-}
+      EDITFLOW_EMAIL_USE_SSL: ${EDITFLOW_EMAIL_USE_SSL:-false}
+      EDITFLOW_EMAIL_STARTTLS: ${EDITFLOW_EMAIL_STARTTLS:-true}
+      EDITFLOW_EMAIL_PUBLIC_URL: ${EDITFLOW_EMAIL_PUBLIC_URL:-http://localhost:5173}
       EDITFLOW_STORAGE_BACKEND: ${EDITFLOW_STORAGE_BACKEND:-local}
       EDITFLOW_STORAGE_ROOT: /var/lib/editflow
       S3_BUCKET: ${S3_BUCKET:-}
@@ -45,7 +55,7 @@ services:
       context: ./apps/api
     command: ["python", "-m", "app.worker_main"]
     environment:
-      DATABASE_URL: postgresql+asyncpg://editflow:editflow@postgres:5432/editflow
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://editflow:editflow@postgres:5432/editflow}
       EDITFLOW_STORAGE_BACKEND: ${EDITFLOW_STORAGE_BACKEND:-local}
       EDITFLOW_STORAGE_ROOT: /var/lib/editflow
       S3_BUCKET: ${S3_BUCKET:-}
