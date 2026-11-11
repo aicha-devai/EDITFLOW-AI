@@ -1,7 +1,7 @@
-"""Create a PostgreSQL custom-format backup and verify its archive/checksum.
+"""Create an encrypted PostgreSQL custom-format backup and verify its archive/checksum.
 
-Requires DATABASE_URL and pg_dump/pg_restore on PATH. Store the resulting backup and
-metadata in encrypted, access-controlled off-host storage with a retention policy.
+Requires DATABASE_URL, BACKUP_AGE_RECIPIENT, pg_dump, pg_restore, and age on PATH.
+Copy the encrypted archive and metadata to access-controlled off-host storage.
 """
 import argparse
 import hashlib
@@ -44,37 +44,45 @@ def sha256_file(path: Path) -> str:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", default="backups")
+    parser.add_argument("--age-recipient", default=os.environ.get("BACKUP_AGE_RECIPIENT"))
     args = parser.parse_args()
     database_url = os.environ.get("DATABASE_URL")
     if not database_url:
         parser.error("DATABASE_URL must be supplied through the environment/secret manager")
-    for binary in ("pg_dump", "pg_restore"):
+    if not args.age_recipient:
+        parser.error("Set BACKUP_AGE_RECIPIENT to the backup recipient public key")
+    for binary in ("pg_dump", "pg_restore", "age"):
         if not shutil.which(binary):
             parser.error(f"{binary} is required on PATH")
 
     output_dir = Path(args.output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    archive = output_dir / f"editflow-{stamp}.dump"
-    metadata = archive.with_suffix(".json")
+    plaintext = output_dir / f"editflow-{stamp}.dump"
+    archive = output_dir / f"editflow-{stamp}.dump.age"
+    metadata = output_dir / f"editflow-{stamp}.json"
     env = connection_environment(database_url)
 
     try:
         subprocess.run(
-            ["pg_dump", "--format=custom", "--no-owner", "--no-acl", "--file", str(archive)],
+            ["pg_dump", "--format=custom", "--no-owner", "--no-acl", "--file", str(plaintext)],
             env=env, check=True,
         )
-        subprocess.run(["pg_restore", "--list", str(archive)], check=True, capture_output=True, text=True)
+        subprocess.run(["pg_restore", "--list", str(plaintext)], check=True, capture_output=True, text=True)
+        subprocess.run(["age", "--encrypt", "--recipient", args.age_recipient, "--output", str(archive), str(plaintext)], check=True)
+        plaintext.unlink()
         digest = sha256_file(archive)
         metadata.write_text(json.dumps({
             "created_at": stamp,
-            "format": "postgres-custom",
+            "format": "postgres-custom+age",
             "archive": archive.name,
             "sha256": digest,
+            "encrypted": True,
             "verified": True,
         }, indent=2) + "\n", encoding="utf-8")
-        print(json.dumps({"archive": str(archive), "metadata": str(metadata), "sha256": digest, "verified": True}))
+        print(json.dumps({"archive": str(archive), "metadata": str(metadata), "sha256": digest, "encrypted": True, "verified": True}))
     except Exception:
+        plaintext.unlink(missing_ok=True)
         archive.unlink(missing_ok=True)
         metadata.unlink(missing_ok=True)
         raise
