@@ -1,4 +1,5 @@
-from uuid import UUID
+from uuid import UUID, uuid4
+from datetime import datetime, timedelta, timezone
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
@@ -6,12 +7,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.db import get_db
 from app.rendering import create_render_job, get_render_job, request_render_cancellation, RenderJobNotFound
-from sqlalchemy import select, or_, delete
+from sqlalchemy import select, or_, delete, update
 from sqlalchemy.exc import IntegrityError
-from app.models import Project, RenderJob, User, ProjectMember
+from app.models import Project, RenderJob, User, ProjectMember, UserSession
 from app.schemas import (
     ProjectCreate, SaveTimelineRequest, RestoreRequest, CreateRenderRequest,
-    QCCriticApprovalRequest, AuthRegisterRequest, AuthLoginRequest, ProjectMemberUpsert,
+    QCCriticApprovalRequest, AuthRegisterRequest, AuthLoginRequest, ProjectMemberUpsert, RefreshTokenRequest,
 )
 from app.qc_critic import (
     generate_qc_critic_proposals, approve_qc_intent_proposals,
@@ -22,7 +23,7 @@ from app.versioning import (
     VersionConflict, ProjectNotFound,
 )
 from app.storage import create_object_storage, LocalObjectStorage, S3ObjectStorage, StorageError
-from app.auth import get_current_user, hash_password, verify_password, create_access_token
+from app.auth import get_current_user, hash_password, verify_password, create_access_token, generate_refresh_token, hash_refresh_token
 
 app = FastAPI(title=settings.api_title, version="0.1.0")
 _allowed_origins = [origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()]
@@ -89,6 +90,18 @@ async def require_project_editor(
     return project
 
 
+
+def _new_refresh_session(user_id: UUID, family_id: UUID | None = None):
+    raw_token = generate_refresh_token()
+    session = UserSession(
+        user_id=user_id,
+        family_id=family_id or uuid4(),
+        refresh_token_hash=hash_refresh_token(raw_token),
+        expires_at=datetime.now(timezone.utc) + timedelta(days=settings.auth_refresh_token_days),
+    )
+    return raw_token, session
+
+
 @app.post("/v1/auth/register", status_code=201)
 async def register_account(payload: AuthRegisterRequest, db: AsyncSession = Depends(get_db)):
     if not settings.auth_secret or len(settings.auth_secret.encode("utf-8")) < 32:
@@ -101,6 +114,8 @@ async def register_account(payload: AuthRegisterRequest, db: AsyncSession = Depe
     try:
         await db.flush()
         access_token = create_access_token(user.id)
+        refresh_token, session = _new_refresh_session(user.id)
+        db.add(session)
         await db.commit()
     except IntegrityError:
         await db.rollback()
@@ -111,6 +126,7 @@ async def register_account(payload: AuthRegisterRequest, db: AsyncSession = Depe
     return {
         "user": {"id": str(user.id), "email": user.email},
         "access_token": access_token,
+        "refresh_token": refresh_token,
         "token_type": "bearer",
         "expires_in": settings.auth_access_token_seconds,
     }
@@ -121,12 +137,74 @@ async def login_account(payload: AuthLoginRequest, db: AsyncSession = Depends(ge
     user = await db.scalar(select(User).where(User.email == payload.email))
     if user is None or not user.is_active or not verify_password(payload.password, user.password_hash):
         raise HTTPException(401, "Invalid email or password", headers={"WWW-Authenticate": "Bearer"})
+    access_token = create_access_token(user.id)
+    refresh_token, session = _new_refresh_session(user.id)
+    db.add(session)
+    await db.commit()
     return {
         "user": {"id": str(user.id), "email": user.email},
-        "access_token": create_access_token(user.id),
+        "access_token": access_token,
+        "refresh_token": refresh_token,
         "token_type": "bearer",
         "expires_in": settings.auth_access_token_seconds,
     }
+
+
+@app.post("/v1/auth/refresh")
+async def refresh_account(payload: RefreshTokenRequest, db: AsyncSession = Depends(get_db)):
+    token_hash = hash_refresh_token(payload.refresh_token)
+    session = await db.scalar(
+        select(UserSession).where(UserSession.refresh_token_hash == token_hash).with_for_update()
+    )
+    if session is None:
+        raise HTTPException(401, "Invalid refresh token")
+    now = datetime.now(timezone.utc)
+    if session.revoked_at is not None:
+        # Reuse of a rotated token compromises the whole session family.
+        await db.execute(update(UserSession).where(
+            UserSession.family_id == session.family_id,
+            UserSession.revoked_at.is_(None),
+        ).values(revoked_at=now))
+        await db.commit()
+        raise HTTPException(401, "Refresh token reuse detected; sign in again")
+    if session.expires_at <= now:
+        session.revoked_at = now
+        await db.commit()
+        raise HTTPException(401, "Refresh token expired; sign in again")
+    user = await db.scalar(select(User).where(User.id == session.user_id, User.is_active.is_(True)))
+    if user is None:
+        session.revoked_at = now
+        await db.commit()
+        raise HTTPException(401, "User account is unavailable")
+    session.revoked_at = now
+    access_token = create_access_token(user.id)
+    refresh_token, replacement = _new_refresh_session(user.id, session.family_id)
+    db.add(replacement)
+    await db.commit()
+    return {
+        "user": {"id": str(user.id), "email": user.email},
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "expires_in": settings.auth_access_token_seconds,
+    }
+
+
+@app.post("/v1/auth/logout")
+async def logout_account(payload: RefreshTokenRequest, db: AsyncSession = Depends(get_db)):
+    session = await db.scalar(
+        select(UserSession).where(
+            UserSession.refresh_token_hash == hash_refresh_token(payload.refresh_token)
+        ).with_for_update()
+    )
+    if session is not None and session.revoked_at is None:
+        now = datetime.now(timezone.utc)
+        await db.execute(update(UserSession).where(
+            UserSession.family_id == session.family_id,
+            UserSession.revoked_at.is_(None),
+        ).values(revoked_at=now))
+        await db.commit()
+    return {"revoked": True}
 
 
 @app.get("/v1/auth/me")
