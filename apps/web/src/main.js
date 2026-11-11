@@ -649,11 +649,10 @@ async function loadGraph() {
     if(state.mediaObjectUrl) URL.revokeObjectURL(state.mediaObjectUrl);
     state.mediaObjectUrl=""; state.mediaUrl="";
     if(body.media_available && body.media_url) {
-      const mediaResponse=await authorizedFetch(base + body.media_url,{headers:{Accept:"video/mp4"}});
-      if(mediaResponse.ok) {
-        state.mediaObjectUrl=URL.createObjectURL(await mediaResponse.blob());
-        state.mediaUrl=state.mediaObjectUrl;
-      }
+      // Keep playback on the authenticated same-origin API route. The API
+      // redirects the browser to a short-lived S3 URL; fetch(blob) here would
+      // require a separate bucket CORS policy and buffer the entire video.
+      state.mediaUrl = base + body.media_url;
     }
     state.playbackSeconds=0; state.playbackWasPlaying=false; state.pendingSeekSeconds=null; state.selectedId=null; state.selectedEdgeId=null; state.search=""; state.filter="all";
   } catch(error) {
