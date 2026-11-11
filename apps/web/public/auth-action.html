@@ -51,7 +51,8 @@
   const token = params.get("token") || new URLSearchParams(location.hash.slice(1)).get("token") || "";
   // Keep one-time credentials out of the visible URL and subsequent browser history.
   if (token) history.replaceState(null, "", location.pathname + "?action=" + encodeURIComponent(action || ""));
-  const localDev = ["localhost", "127.0.0.1"].includes(location.hostname) && ["5173", "4173"].includes(location.port);\n  const api = (localStorage.getItem("editflow-api-base") || (localDev ? "http://localhost:8000" : location.origin)).replace(/\/$/, "");
+  const localDev = ["localhost", "127.0.0.1"].includes(location.hostname) && ["5173", "4173"].includes(location.port);
+  const api = (localStorage.getItem("editflow-api-base") || (localDev ? "http://localhost:8000" : location.origin)).replace(/\/$/, "");
   const $ = id => document.getElementById(id);
   const form = $("action-form"), status = $("status");
   const show = id => $(id).classList.remove("hidden");
