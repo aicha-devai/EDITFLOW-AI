@@ -104,6 +104,40 @@ async def test_access_cookie_authenticates_without_bearer_header(db_session, mon
     assert await get_current_user(request, None, db_session) is user
 
 
+def test_cookie_authenticated_mutations_require_matching_csrf_cookie_and_header():
+    from fastapi.testclient import TestClient
+    import app.main as main
+
+    client = TestClient(main.app)
+    blocked = client.post("/v1/not-a-real-route", cookies={"editflow_access": "opaque-session"})
+    assert blocked.status_code == 403
+    accepted_past_csrf = client.post(
+        "/v1/not-a-real-route",
+        cookies={"editflow_access": "opaque-session", "editflow_csrf": "csrf-value"},
+        headers={"X-CSRF-Token": "csrf-value"},
+    )
+    assert accepted_past_csrf.status_code == 404
+
+
+def test_cookie_auth_cors_preflight_allows_csrf_headers():
+    from fastapi.testclient import TestClient
+    import app.main as main
+
+    response = TestClient(main.app).options(
+        "/v1/auth/login",
+        headers={
+            "Origin": "http://localhost:5173",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type,x-editflow-cookie-auth,x-csrf-token",
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers.get("access-control-allow-credentials") == "true"
+    allowed = response.headers.get("access-control-allow-headers", "").lower()
+    assert "x-csrf-token" in allowed
+    assert "x-editflow-cookie-auth" in allowed
+
+
 @pytest.mark.asyncio
 async def test_register_and_login_issue_tokens_for_normalized_email(db_session, monkeypatch):
     from app.config import settings
