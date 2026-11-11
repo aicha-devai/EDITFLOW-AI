@@ -105,10 +105,18 @@ async function loadExplorer(page) {
 test("clicking timestamped evidence seeks to its exact timestamp and starts playback", async ({ page }) => {
   await loadExplorer(page);
 
+  const video = page.locator("#story-video");
+  await video.evaluate(el => {
+    el.playbackRate = 0.1;
+    el.dataset.lastSeekedTime = "";
+    el.addEventListener("seeked", () => {
+      el.dataset.lastSeekedTime = String(el.currentTime);
+    }, { once: true });
+  });
+
   await page.locator('[data-evidence-node="shot-12"]').click();
 
-  const video = page.locator("#story-video");
-  await expect.poll(() => video.evaluate(el => el.currentTime)).toBe(12.5);
+  await expect.poll(() => video.evaluate(el => Number(el.dataset.lastSeekedTime))).toBe(12.5);
   await expect(page.locator("#player-time")).toHaveText("00:12.5");
   await expect(page.locator("#active-evidence-label")).toContainText("Hallway shot");
   await expect.poll(() => video.evaluate(el => el.paused)).toBe(false);
@@ -145,7 +153,7 @@ test("untimed relationship evidence has no jump control and does not move playba
 
   await page.locator('[data-edge="character-shot"]').click({ force: true });
 
-  await expect(page.getByText("Unaligned narration")).toBeVisible();
+  await expect(page.locator(".evidence-card p").filter({ hasText: "Unaligned narration" })).toBeVisible();
   await expect(page.locator(".evidence-card [data-jump-time]")).toHaveCount(0);
   await expect.poll(() => video.evaluate(el => el.currentTime)).toBe(8.5);
   await expect(page.locator(".evidence-card .evidence-time")).toContainText("Time unavailable");
