@@ -104,7 +104,7 @@ def _new_refresh_session(user_id: UUID, family_id: UUID | None = None):
 
 
 @app.post("/v1/auth/register", status_code=201)
-async def register_account(payload: AuthRegisterRequest, db: AsyncSession = Depends(get_db), request: Request | None = None):
+async def register_account(payload: AuthRegisterRequest, db: AsyncSession = Depends(get_db), request: Request = None):
     if not settings.auth_secret or len(settings.auth_secret.encode("utf-8")) < 32:
         raise HTTPException(503, "Authentication is not configured")
     client_ip = request.client.host if request and request.client else "unknown"
@@ -136,7 +136,7 @@ async def register_account(payload: AuthRegisterRequest, db: AsyncSession = Depe
 
 
 @app.post("/v1/auth/login")
-async def login_account(payload: AuthLoginRequest, db: AsyncSession = Depends(get_db), request: Request | None = None):
+async def login_account(payload: AuthLoginRequest, db: AsyncSession = Depends(get_db), request: Request = None):
     client_ip = request.client.host if request and request.client else "unknown"
     await enforce_rate_limit(
         db,
