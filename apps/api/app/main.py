@@ -99,8 +99,8 @@ async def get_authenticated_account(current_user: User = Depends(get_current_use
     return {"id": str(current_user.id), "email": current_user.email, "is_active": current_user.is_active}
 
 @app.post("/v1/projects", status_code=201)
-async def create_project(payload: ProjectCreate, db: AsyncSession = Depends(get_db)):
-    project = Project(title=payload.title.strip())
+async def create_project(payload: ProjectCreate, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    project = Project(title=payload.title.strip(), owner_id=current_user.id)
     db.add(project)
     await db.commit()
     await db.refresh(project)
