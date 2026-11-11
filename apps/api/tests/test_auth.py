@@ -302,3 +302,127 @@ async def test_auth_rate_limits_are_isolated_by_scope(db_session, monkeypatch):
     monkeypatch.setattr(settings, "auth_secret", "test-secret-that-is-long-enough-for-hmac-256")
     await enforce_rate_limit(db_session, ["login:ip:203.0.113.11"], 1, 900)
     await enforce_rate_limit(db_session, ["login:ip:203.0.113.12"], 1, 900)
+
+
+@pytest.mark.asyncio
+async def test_unverified_user_is_blocked_until_single_use_verification(db_session, monkeypatch):
+    from urllib.parse import urlparse, parse_qs
+    import app.main as main
+    from app.config import settings
+    from app.schemas import AuthRegisterRequest, AuthLoginRequest, ActionTokenRequest
+    from fastapi import HTTPException
+
+    monkeypatch.setattr(settings, "auth_secret", "test-secret-that-is-long-enough-for-hmac-256")
+    sent = []
+    async def fake_send_email(recipient, subject, body):
+        sent.append(body)
+    monkeypatch.setattr(main, "send_email", fake_send_email)
+    await main.register_account(AuthRegisterRequest(
+        email="pending@example.com", password="secure password long"
+    ), db_session)
+    with pytest.raises(HTTPException) as blocked:
+        await main.login_account(AuthLoginRequest(
+            email="pending@example.com", password="secure password long"
+        ), db_session)
+    assert blocked.value.status_code == 403
+    link = next(line for line in sent[0].splitlines() if "token=" in line)
+    token = parse_qs(urlparse(link).query)["token"][0]
+    assert await main.verify_email(ActionTokenRequest(token=token), db_session) == {"verified": True}
+    with pytest.raises(HTTPException) as replay:
+        await main.verify_email(ActionTokenRequest(token=token), db_session)
+    assert replay.value.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_password_reset_revokes_sessions_and_token_cannot_be_reused(db_session, monkeypatch):
+    from urllib.parse import urlparse, parse_qs
+    import app.main as main
+    from app.config import settings
+    from app.schemas import EmailOnlyRequest, PasswordResetRequest, AuthLoginRequest, RefreshTokenRequest
+    from fastapi import HTTPException
+
+    monkeypatch.setattr(settings, "auth_secret", "test-secret-that-is-long-enough-for-hmac-256")
+    session = await _register_verified_account(
+        db_session, monkeypatch, "reset-user@example.com", "old secure password"
+    )
+    sent = []
+    async def fake_send_email(recipient, subject, body):
+        sent.append(body)
+    monkeypatch.setattr(main, "send_email", fake_send_email)
+    await main.request_password_reset(EmailOnlyRequest(email="reset-user@example.com"), db_session)
+    link = next(line for line in sent[0].splitlines() if "token=" in line)
+    token = parse_qs(urlparse(link).query)["token"][0]
+    assert await main.reset_password(
+        PasswordResetRequest(token=token, new_password="new secure password"),
+        db_session,
+    ) == {"password_reset": True, "sessions_revoked": True}
+    with pytest.raises(HTTPException) as replay:
+        await main.reset_password(
+            PasswordResetRequest(token=token, new_password="another secure password"),
+            db_session,
+        )
+    assert replay.value.status_code == 400
+    with pytest.raises(HTTPException) as old_session:
+        await main.refresh_account(RefreshTokenRequest(
+            refresh_token=session["refresh_token"]
+        ), db_session)
+    assert old_session.value.status_code == 401
+    with pytest.raises(HTTPException) as old_password:
+        await main.login_account(AuthLoginRequest(
+            email="reset-user@example.com", password="old secure password"
+        ), db_session)
+    assert old_password.value.status_code == 401
+    new_session = await main.login_account(AuthLoginRequest(
+        email="reset-user@example.com", password="new secure password"
+    ), db_session)
+    assert new_session["user"]["email"] == "reset-user@example.com"
+
+
+@pytest.mark.asyncio
+async def test_invitation_is_bound_to_verified_email_and_single_use(db_session, monkeypatch):
+    from urllib.parse import urlparse, parse_qs
+    import app.main as main
+    from app.config import settings
+    from app.models import Project, ProjectMember, User
+    from app.schemas import ProjectInvitationCreate, ActionTokenRequest
+    from sqlalchemy import select
+    from fastapi import HTTPException
+
+    monkeypatch.setattr(settings, "auth_secret", "test-secret-that-is-long-enough-for-hmac-256")
+    owner = User(email="project-owner@example.com", password_hash=hash_password("owner password long"), is_email_verified=True)
+    invitee = User(email="invitee@example.com", password_hash=hash_password("invitee password long"), is_email_verified=True)
+    impostor = User(email="impostor@example.com", password_hash=hash_password("impostor password long"), is_email_verified=True)
+    db_session.add_all([owner, invitee, impostor])
+    await db_session.flush()
+    project = Project(title="Invite test", owner_id=owner.id)
+    db_session.add(project)
+    await db_session.flush()
+    sent = []
+    async def fake_send_email(recipient, subject, body):
+        sent.append((recipient, body))
+    monkeypatch.setattr(main, "send_email", fake_send_email)
+    await main.create_project_invitation(
+        project.id, ProjectInvitationCreate(email=invitee.email, role="editor"),
+        db_session, _owned_project=project,
+    )
+    assert sent[0][0] == invitee.email
+    link = next(line for line in sent[0][1].splitlines() if "token=" in line)
+    token = parse_qs(urlparse(link).query)["token"][0]
+    with pytest.raises(HTTPException) as mismatch:
+        await main.accept_project_invitation(
+            ActionTokenRequest(token=token), db_session, current_user=impostor
+        )
+    assert mismatch.value.status_code == 403
+    result = await main.accept_project_invitation(
+        ActionTokenRequest(token=token), db_session, current_user=invitee
+    )
+    assert result["accepted"] is True and result["role"] == "editor"
+    member = await db_session.scalar(select(ProjectMember).where(
+        ProjectMember.project_id == project.id, ProjectMember.user_id == invitee.id
+    ))
+    assert member.role == "editor"
+    with pytest.raises(HTTPException) as replay:
+        await main.accept_project_invitation(
+            ActionTokenRequest(token=token), db_session, current_user=invitee
+        )
+    assert replay.value.status_code == 400
