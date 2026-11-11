@@ -41,6 +41,7 @@ test.describe("real Staging upload → render → Story Graph flow", () => {
     await page.locator("#account-password").fill(password);
     await page.locator("#account-login").click();
     await expect(page.locator("#account-status")).toContainText(email, { timeout: 20_000 });
+    await expect(page.locator(".studio-panel")).toHaveAttribute("data-studio-ready", "true", { timeout: 20_000 });
 
     const title = "Staging E2E " + new Date().toISOString();
     await page.locator("#studio-project-title").fill(title);
