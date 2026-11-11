@@ -105,4 +105,9 @@ The Explorer also shows a horizontally scrollable, timestamp-sorted evidence str
 - See [Production Security and Email Readiness](PRODUCTION_SECURITY_AND_EMAIL_READINESS.md) for mandatory deployment checks and remaining launch blockers.
 - See [Legacy Project Ownership Recovery](LEGACY_PROJECT_OWNERSHIP.md) for the read-only inventory and audited claim runbook.
 
-**Production status:** not approved for public launch until the production ownership inventory is reconciled, SMTP delivery is verified, browser tokens move to HttpOnly cookies (or an equivalent BFF design), and infrastructure/backup controls are signed off.
+**Production status:** not approved for public launch. HttpOnly cookie sessions and CSRF protection are implemented; production deployment, real-host HTTPS/browser verification, SPF/DKIM/DMARC and SMTP delivery, legacy ownership review, and backup/restore drills remain mandatory external gates. See [Production Security and Email Readiness](PRODUCTION_SECURITY_AND_EMAIL_READINESS.md).
+
+
+### Production deployment
+
+A standalone production topology is provided in `docker-compose.production.yml`. It expects a managed PostgreSQL database with TLS, S3-compatible storage, real SMTP credentials, and TLS certificate files under `deploy/tls/`. Only the Nginx ingress publishes ports 80 and 443; it routes `/v1/*` and `/health` to the API and the remaining paths to the web app. Review the deployment and verification runbook before use.
