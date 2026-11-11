@@ -144,20 +144,20 @@ function render() {
 }
 
 function renderStudio() {
-  const options = state.studioProjects.map(p => \`<option value="\${escapeHtml(p.id)}" \${p.id===state.studioProjectId?"selected":""}>\${escapeHtml(p.title)}</option>\`).join("");
+  const options = state.studioProjects.map(p => `<option value="${escapeHtml(p.id)}" ${p.id===state.studioProjectId?"selected":""}>${escapeHtml(p.title)}</option>`).join("");
   const asset=state.studioAsset;
-  return \`<section class="studio-panel" aria-label="Project studio">
+  return `<section class="studio-panel" aria-label="Project studio">
     <div class="studio-heading"><div><span class="eyebrow">PROJECT WORKSPACE</span><h2>Create, upload and render</h2><p>Start a project, add a source video and create a real render job.</p></div><span class="studio-step">01 — 03</span></div>
-    \${state.accessToken ? \`
-      <form id="studio-project-form" class="studio-project-form"><label>NEW PROJECT TITLE<input id="studio-project-title" maxlength="200" placeholder="e.g. My first story" required></label><button class="primary-button" type="submit" \${state.studioBusy?"disabled":""}>Create project <span>＋</span></button></form>
-      <div class="studio-controls"><label>ACTIVE PROJECT<select id="studio-project-select" \${state.studioProjects.length?"":"disabled"}><option value="">Choose a project</option>\${options}</select></label>
+    ${state.accessToken ? `
+      <form id="studio-project-form" class="studio-project-form"><label>NEW PROJECT TITLE<input id="studio-project-title" maxlength="200" placeholder="e.g. My first story" required></label><button class="primary-button" type="submit" ${state.studioBusy?"disabled":""}>Create project <span>＋</span></button></form>
+      <div class="studio-controls"><label>ACTIVE PROJECT<select id="studio-project-select" ${state.studioProjects.length?"":"disabled"}><option value="">Choose a project</option>${options}</select></label>
       <label class="studio-file-label">SOURCE VIDEO<input id="studio-video-file" type="file" accept=".mp4,.m4v,.mov,.webm,video/mp4,video/quicktime,video/webm"></label>
-      <div class="studio-actions"><button id="studio-upload" class="secondary-button" type="button" \${!state.studioProjectId||state.studioBusy?"disabled":""}>Upload video to storage</button><button id="studio-render" class="primary-button" type="button" \${!asset||!state.studioTimelineVersion||state.studioBusy?"disabled":""}>Start render <span>→</span></button></div></div>
-      \${asset?\`<div class="studio-asset" data-testid="uploaded-asset"><span class="studio-check">✓</span><div><strong>\${escapeHtml(asset.original_filename)}</strong><small>\${(asset.size_bytes/1048576).toFixed(2)} MB · \${Number(asset.duration_seconds).toFixed(2)} sec · SHA-256 \${escapeHtml(asset.checksum_sha256.slice(0,16))}… · Timeline v\${state.studioTimelineVersion}</small></div></div>\`:""}
-      \${state.studioJob?\`<div class="studio-job" data-testid="render-job"><div><strong>Render \${escapeHtml(state.studioJob.status)}</strong><small>\${escapeHtml(state.studioJob.job_id)}</small></div><div class="studio-progress"><i style="width:\${Math.max(0,Math.min(100,Number(state.studioJob.progress_percent)||0))}%"></i></div><b>\${Number(state.studioJob.progress_percent)||0}%</b></div>\`:""}
-      <p id="studio-status" class="studio-status" role="status">\${escapeHtml(state.studioStatus||"Create a project to begin. Uploaded media is validated and linked to an immutable timeline version.")}</p>
-    \`:\`<div class="studio-locked">Sign in with a verified account to create projects and upload source videos.</div>\`}
-  </section>\`;
+      <div class="studio-actions"><button id="studio-upload" class="secondary-button" type="button" ${!state.studioProjectId||state.studioBusy?"disabled":""}>Upload video to storage</button><button id="studio-render" class="primary-button" type="button" ${!asset||!state.studioTimelineVersion||state.studioBusy?"disabled":""}>Start render <span>→</span></button></div></div>
+      ${asset?`<div class="studio-asset" data-testid="uploaded-asset"><span class="studio-check">✓</span><div><strong>${escapeHtml(asset.original_filename)}</strong><small>${(asset.size_bytes/1048576).toFixed(2)} MB · ${Number(asset.duration_seconds).toFixed(2)} sec · SHA-256 ${escapeHtml(asset.checksum_sha256.slice(0,16))}… · Timeline v${state.studioTimelineVersion}</small></div></div>`:""}
+      ${state.studioJob?`<div class="studio-job" data-testid="render-job"><div><strong>Render ${escapeHtml(state.studioJob.status)}</strong><small>${escapeHtml(state.studioJob.job_id)}</small></div><div class="studio-progress"><i style="width:${Math.max(0,Math.min(100,Number(state.studioJob.progress_percent)||0))}%"></i></div><b>${Number(state.studioJob.progress_percent)||0}%</b></div>`:""}
+      <p id="studio-status" class="studio-status" role="status">${escapeHtml(state.studioStatus||"Create a project to begin. Uploaded media is validated and linked to an immutable timeline version.")}</p>
+    `:`<div class="studio-locked">Sign in with a verified account to create projects and upload source videos.</div>`}
+  </section>`;
 }
 function bindStudio() {
   $("#studio-project-form")?.addEventListener("submit",createStudioProject);
