@@ -1,4 +1,4 @@
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -66,9 +66,9 @@ def validate_production_settings() -> None:
         problems.append("EDITFLOW_AUTH_SECRET must contain at least 32 characters")
 
     public_url = urlsplit(settings.email_public_url)
-    if public_url.scheme != "https" or not public_url.hostname or public_url.username or public_url.password:
+    if public_url.scheme != "https" or not public_url.hostname or public_url.username or public_url.password or public_url.path not in {"", "/"} or public_url.query or public_url.fragment:
         problems.append("EDITFLOW_EMAIL_PUBLIC_URL must be an HTTPS origin")
-    if not settings.email_smtp_host or not settings.email_from:
+    if not settings.email_smtp_host or not settings.email_from or "\\r" in (settings.email_from or "") or "\\n" in (settings.email_from or ""):
         problems.append("SMTP host and sender address must be configured")
     if settings.email_use_ssl == settings.email_starttls:
         problems.append("Configure exactly one SMTP transport mode: SSL or STARTTLS")
@@ -80,7 +80,7 @@ def validate_production_settings() -> None:
         problems.append("EDITFLOW_CORS_ORIGINS must contain the production frontend origin")
     for origin in origins:
         parsed = urlsplit(origin)
-        if parsed.scheme != "https" or not parsed.hostname or parsed.hostname in {"localhost", "127.0.0.1", "::1"} or "*" in origin:
+        if parsed.scheme != "https" or not parsed.hostname or parsed.hostname in {"localhost", "127.0.0.1", "::1"} or "*" in origin or parsed.username or parsed.password or parsed.path not in {"", "/"} or parsed.query or parsed.fragment:
             problems.append("EDITFLOW_CORS_ORIGINS must contain only explicit HTTPS origins")
             break
 
@@ -90,6 +90,10 @@ def validate_production_settings() -> None:
     db_url = urlsplit(settings.database_url)
     if not db_url.hostname or db_url.hostname in {"localhost", "127.0.0.1", "::1"}:
         problems.append("DATABASE_URL must point to a non-local production database")
+    ssl_options = parse_qs(db_url.query)
+    ssl_mode = (ssl_options.get("ssl", []) + ssl_options.get("sslmode", []))
+    if not any(value in {"require", "verify-ca", "verify-full"} for value in ssl_mode):
+        problems.append("DATABASE_URL must explicitly require TLS using ssl=require or sslmode=require/verify-full")
 
     if problems:
         raise RuntimeError("Production configuration rejected: " + "; ".join(problems))
