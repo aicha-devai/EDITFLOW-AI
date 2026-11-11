@@ -17,7 +17,7 @@ async def db_session():
     # truncate data only, so PostgreSQL triggers and constraints are exercised.
     async with engine.begin() as conn:
         await conn.execute(text(
-            "TRUNCATE TABLE rate_limit_buckets, users, render_jobs, timeline_asset_references, "
+            "TRUNCATE TABLE rate_limit_buckets, auth_action_tokens, project_invitations, users, render_jobs, timeline_asset_references, "
             "timeline_versions, assets, projects RESTART IDENTITY CASCADE"
         ))
     factory = async_sessionmaker(engine, expire_on_commit=False)
