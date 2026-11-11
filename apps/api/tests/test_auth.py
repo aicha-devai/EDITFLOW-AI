@@ -61,23 +61,32 @@ async def test_register_and_login_issue_tokens_for_normalized_email(db_session, 
 
 
 @pytest.mark.asyncio
-async def test_project_access_is_scoped_to_authenticated_owner():
-    from types import SimpleNamespace
+async def test_project_access_is_scoped_to_authenticated_owner(db_session):
     from uuid import uuid4
     from fastapi import HTTPException
     from app.main import require_owned_project
+    from app.models import Project, User
 
-    owner_id, other_id, project_id = uuid4(), uuid4(), uuid4()
-    project = SimpleNamespace(id=project_id, owner_id=owner_id)
+    owner = User(email="owner@example.com", password_hash=hash_password("owner password long"))
+    other = User(email="other@example.com", password_hash=hash_password("other password long"))
+    db_session.add_all([owner, other])
+    await db_session.flush()
+    project = Project(title="Private project", owner_id=owner.id)
+    db_session.add(project)
+    await db_session.flush()
 
-    class OwnershipDB:
-        async def scalar(self, statement):
-            return project if owner_id == requested_owner else None
+    assert await require_owned_project(
+        project.id, db=db_session, current_user=owner
+    ) is project
 
-    requested_owner = owner_id
-    assert await require_owned_project(project_id, db=OwnershipDB(), current_user=SimpleNamespace(id=owner_id)) is project
-
-    requested_owner = other_id
     with pytest.raises(HTTPException) as error:
-        await require_owned_project(project_id, db=OwnershipDB(), current_user=SimpleNamespace(id=other_id))
+        await require_owned_project(
+            project.id, db=db_session, current_user=other
+        )
     assert error.value.status_code == 404
+
+    with pytest.raises(HTTPException) as missing:
+        await require_owned_project(
+            uuid4(), db=db_session, current_user=owner
+        )
+    assert missing.value.status_code == 404
