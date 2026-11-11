@@ -438,16 +438,18 @@ async def test_legacy_project_claim_is_dry_run_by_default_and_audited_on_apply(d
     project = Project(title="Imported legacy project", owner_id=None)
     db_session.add_all([owner, project])
     await db_session.flush()
+    project_id = project.id
+    owner_email = owner.email
 
     preview = await claim_legacy_project(
-        db_session, project.id, owner.email, "ops-ticket-42", "Customer ownership verified from original invoice", apply=False
+        db_session, project_id, owner_email, "ops-ticket-42", "Customer ownership verified from original invoice", apply=False
     )
     assert preview["dry_run"] is True
     await db_session.refresh(project)
     assert project.owner_id is None
 
     applied = await claim_legacy_project(
-        db_session, project.id, owner.email, "ops-ticket-42", "Customer ownership verified from original invoice", apply=True
+        db_session, project_id, owner_email, "ops-ticket-42", "Customer ownership verified from original invoice", apply=True
     )
     assert applied["applied"] is True
     await db_session.refresh(project)
