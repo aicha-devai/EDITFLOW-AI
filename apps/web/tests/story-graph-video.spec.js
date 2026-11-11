@@ -75,7 +75,7 @@ test.afterAll(() => {
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
-    if (!sessionStorage.getItem("editflow-access-token")) {
+    if (localStorage.getItem("editflow-playwright-cookie-only") !== "1" && !sessionStorage.getItem("editflow-access-token")) {
       sessionStorage.setItem("editflow-access-token", "test-access-token");
       sessionStorage.setItem("editflow-refresh-token", "test-refresh-token");
       sessionStorage.setItem("editflow-user-email", "owner@example.com");
@@ -212,6 +212,11 @@ test("account panel exposes resend verification and owner invitation controls", 
 });
 
 test("invitation acceptance stores the authenticated session and returns to the app", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("editflow-playwright-cookie-only", "1");
+    sessionStorage.removeItem("editflow-access-token");
+    sessionStorage.removeItem("editflow-refresh-token");
+  });
   await page.route("**/v1/auth/login", async route => {
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
       user: { id: "user-1", email: "invited@example.com" },
