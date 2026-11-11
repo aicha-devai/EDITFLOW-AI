@@ -324,7 +324,7 @@ async def test_unverified_user_is_blocked_until_single_use_verification(db_sessi
         await main.login_account(AuthLoginRequest(
             email="pending@example.com", password="secure password long"
         ), db_session)
-    assert blocked.value.status_code == 403
+    assert blocked.value.status_code == 401
     link = next(line for line in sent[0].splitlines() if "token=" in line)
     token = parse_qs(urlparse(link).fragment)["token"][0]
     assert await main.verify_email(ActionTokenRequest(token=token), db_session) == {"verified": True}
