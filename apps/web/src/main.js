@@ -4,6 +4,10 @@ const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const state = {
   apiBase: localStorage.getItem("editflow-api-base") || "http://localhost:8000",
+  accessToken: sessionStorage.getItem("editflow-access-token") || "",
+  refreshToken: sessionStorage.getItem("editflow-refresh-token") || "",
+  userEmail: sessionStorage.getItem("editflow-user-email") || "",
+  mediaObjectUrl: "",
   projectId: "",
   jobId: "",
   graph: null,
@@ -82,8 +86,8 @@ function render() {
         <header class="topbar">
           <div class="crumb"><span>EDITFLOW AI</span><b>/</b><strong>Story Graph Explorer</strong></div>
           <div class="top-actions">
-            <span class="live-dot"></span><span class="top-status">Evidence workspace</span>
-            <button class="icon-button" id="settings-btn" title="Connection settings">⚙</button>
+            <span class="live-dot"></span><span class="top-status" id="account-status">${state.userEmail ? escapeHtml(state.userEmail) : "Not signed in"}</span>
+            <button class="icon-button" id="account-btn" title="Account and API settings">⚙</button>
           </div>
         </header>
         <section class="intro">
@@ -110,8 +114,15 @@ function render() {
       <section class="settings-modal">
         <div class="modal-head"><div><span class="eyebrow">CONNECTION</span><h2>API settings</h2></div><button id="close-settings" class="icon-button">×</button></div>
         <label>API BASE URL<input id="api-base-input" value="${escapeHtml(state.apiBase)}" placeholder="http://localhost:8000"></label>
-        <p class="muted">Used by this browser to request graph data from your EDITFLOW AI API.</p>
         <button id="save-settings" class="primary-button full">Save connection</button>
+        <div class="modal-head"><div><span class="eyebrow">ACCOUNT</span><h2>Sign in</h2></div></div>
+        <label>EMAIL<input id="account-email" type="email" autocomplete="email" value="${escapeHtml(state.userEmail)}"></label>
+        <label>PASSWORD<input id="account-password" type="password" autocomplete="current-password"></label>
+        <button id="account-login" class="primary-button full">Sign in</button>
+        <button id="account-register" class="secondary-button full">Create account</button>
+        <button id="account-logout" class="icon-button full" ${state.accessToken ? "" : "disabled"}>Sign out</button>
+        <p id="account-message" class="muted" role="status"></p>
+        <p class="muted">New accounts must verify their email before signing in. Access and refresh tokens are kept in this browser tab session.</p>
       </section>
     </div>`;
   bindShell();
@@ -417,7 +428,10 @@ function bindShell() {
     state.jobId=$("#job-input").value.trim();
     await loadGraph();
   });
-  $("#settings-btn")?.addEventListener("click",()=>$("#settings-modal").classList.remove("hidden"));
+  $("#account-btn")?.addEventListener("click",()=>$("#settings-modal").classList.remove("hidden"));
+  $("#account-login")?.addEventListener("click", signIn);
+  $("#account-register")?.addEventListener("click", registerAccount);
+  $("#account-logout")?.addEventListener("click", signOut);
   $("#close-settings")?.addEventListener("click",()=>$("#settings-modal").classList.add("hidden"));
   $("#settings-modal")?.addEventListener("click",e=>{if(e.target.id==="settings-modal") e.currentTarget.classList.add("hidden");});
   $("#save-settings")?.addEventListener("click",()=>{
@@ -426,17 +440,98 @@ function bindShell() {
     $("#settings-modal").classList.add("hidden");
   });
 }
+function saveSession(data, email) {
+  state.accessToken=data.access_token;
+  state.refreshToken=data.refresh_token;
+  state.userEmail=email || data.user?.email || "";
+  sessionStorage.setItem("editflow-access-token",state.accessToken);
+  sessionStorage.setItem("editflow-refresh-token",state.refreshToken);
+  sessionStorage.setItem("editflow-user-email",state.userEmail);
+  const status=$("#account-status");
+  if(status) status.textContent=state.userEmail;
+  const logout=$("#account-logout");
+  if(logout) logout.disabled=false;
+}
+function clearSession() {
+  state.accessToken=""; state.refreshToken=""; state.userEmail="";
+  sessionStorage.removeItem("editflow-access-token");
+  sessionStorage.removeItem("editflow-refresh-token");
+  sessionStorage.removeItem("editflow-user-email");
+  const status=$("#account-status");
+  if(status) status.textContent="Not signed in";
+  const logout=$("#account-logout");
+  if(logout) logout.disabled=true;
+}
+function accountMessage(message, error=false) {
+  const el=$("#account-message");
+  if(el){el.textContent=message;el.style.color=error?"#ff9eaa":"#aebbd5";}
+}
+async function signIn() {
+  const email=$("#account-email").value.trim();
+  const password=$("#account-password").value;
+  try {
+    const response=await fetch(state.apiBase+"/v1/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,password})});
+    const body=await response.json().catch(()=>({}));
+    if(!response.ok) throw new Error(body.detail || "Sign in failed");
+    saveSession(body,email);
+    accountMessage("Signed in successfully.");
+  } catch(error) { accountMessage(error.message || "Could not sign in.",true); }
+}
+async function registerAccount() {
+  const email=$("#account-email").value.trim();
+  const password=$("#account-password").value;
+  try {
+    const response=await fetch(state.apiBase+"/v1/auth/register",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,password})});
+    const body=await response.json().catch(()=>({}));
+    if(!response.ok) throw new Error(body.detail || "Registration failed");
+    accountMessage("Verification email sent. Verify your email, then sign in here.");
+  } catch(error) { accountMessage(error.message || "Could not create account.",true); }
+}
+async function signOut() {
+  try {
+    if(state.refreshToken) await fetch(state.apiBase+"/v1/auth/logout",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({refresh_token:state.refreshToken})});
+  } finally {
+    clearSession();
+    if(state.mediaObjectUrl) URL.revokeObjectURL(state.mediaObjectUrl);
+    state.mediaObjectUrl=""; state.mediaUrl=""; state.graph=null;
+    $("#settings-modal")?.classList.add("hidden");
+    render();
+  }
+}
+async function authorizedFetch(url, options={}) {
+  if(!state.accessToken) throw new Error("Sign in to access this project.");
+  const send=()=>fetch(url,{...options,headers:{...(options.headers||{}),Authorization:"Bearer "+state.accessToken}});
+  let response=await send();
+  if(response.status===401 && state.refreshToken) {
+    const refreshed=await fetch(state.apiBase+"/v1/auth/refresh",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({refresh_token:state.refreshToken})});
+    const body=await refreshed.json().catch(()=>({}));
+    if(!refreshed.ok) { clearSession(); throw new Error("Your session expired. Sign in again."); }
+    saveSession(body);
+    response=await send();
+  }
+  return response;
+}
 async function loadGraph() {
   state.loading=true; state.error=""; render();
   try {
     const base=state.apiBase.replace(/\/$/,"");
     const url=`${base}/v1/projects/${encodeURIComponent(state.projectId)}/renders/${encodeURIComponent(state.jobId)}/story-continuity`;
-    const response=await fetch(url,{headers:{Accept:"application/json"}});
+    const response=await authorizedFetch(url,{headers:{Accept:"application/json"}});
     const body=await response.json().catch(()=>({}));
     if(!response.ok) throw new Error(body.detail || `Request failed (${response.status})`);
     const graph=body.graph;
     if(!graph || !Array.isArray(graph.nodes) || !Array.isArray(graph.edges)) throw new Error("The API response does not contain a valid graph.");
-    state.graph=graph; state.mediaUrl=body.media_available && body.media_url ? base + body.media_url : ""; state.playbackSeconds=0; state.playbackWasPlaying=false; state.pendingSeekSeconds=null; state.selectedId=null; state.selectedEdgeId=null; state.search=""; state.filter="all";
+    state.graph=graph;
+    if(state.mediaObjectUrl) URL.revokeObjectURL(state.mediaObjectUrl);
+    state.mediaObjectUrl=""; state.mediaUrl="";
+    if(body.media_available && body.media_url) {
+      const mediaResponse=await authorizedFetch(base + body.media_url,{headers:{Accept:"video/mp4"}});
+      if(mediaResponse.ok) {
+        state.mediaObjectUrl=URL.createObjectURL(await mediaResponse.blob());
+        state.mediaUrl=state.mediaObjectUrl;
+      }
+    }
+    state.playbackSeconds=0; state.playbackWasPlaying=false; state.pendingSeekSeconds=null; state.selectedId=null; state.selectedEdgeId=null; state.search=""; state.filter="all";
   } catch(error) {
     state.error=error.message || "Could not load the Story Continuity Graph.";
   } finally {
