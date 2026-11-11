@@ -1,5 +1,6 @@
 import asyncio
 import smtplib
+import ssl
 from email.message import EmailMessage
 
 from fastapi import HTTPException
@@ -10,13 +11,17 @@ from app.config import settings
 def _send_sync(recipient: str, subject: str, body: str) -> None:
     if not settings.email_smtp_host or not settings.email_from:
         raise RuntimeError("Email delivery is not configured")
+    if settings.email_use_ssl == settings.email_starttls:
+        raise RuntimeError("Configure exactly one secure SMTP transport: SSL or STARTTLS")
+    if bool(settings.email_smtp_username) != bool(settings.email_smtp_password):
+        raise RuntimeError("SMTP username and password must be configured together")
     message = EmailMessage()
     message["From"] = settings.email_from
     message["To"] = recipient
     message["Subject"] = subject
     message.set_content(body)
     if settings.email_use_ssl:
-        with smtplib.SMTP_SSL(settings.email_smtp_host, settings.email_smtp_port, timeout=15) as smtp:
+        with smtplib.SMTP_SSL(settings.email_smtp_host, settings.email_smtp_port, timeout=15, context=ssl.create_default_context()) as smtp:
             if settings.email_smtp_username:
                 smtp.login(settings.email_smtp_username, settings.email_smtp_password or "")
             smtp.send_message(message)
