@@ -104,10 +104,12 @@ The repository now includes:
 
 ```bash
 cd apps/api
-DATABASE_URL='postgresql+asyncpg://...' python scripts/backup_postgres.py --output-dir /secure-backup-staging
+DATABASE_URL='postgresql+asyncpg://...' \\
+BACKUP_AGE_RECIPIENT='age1...' \\
+  python scripts/backup_postgres.py --output-dir /secure-backup-staging
 ```
 
-The backup command creates a PostgreSQL custom-format archive, validates it with `pg_restore --list`, and writes a SHA-256 metadata file. Copy both files to encrypted, access-controlled off-host storage with immutable retention and alerting. Schedule this command (or the managed database provider's equivalent) at the required RPO; this script is a backup primitive, not a scheduler or off-site storage service.
+The backup command creates a PostgreSQL custom-format archive, validates it with `pg_restore --list`, encrypts it with the age recipient public key, and writes a SHA-256 metadata file for the encrypted archive. Keep the age identity private key outside the backup host and store both archive and metadata in access-controlled off-host storage with immutable retention and alerting. Schedule this command (or the managed database provider's equivalent) at the required RPO; this script is a backup primitive, not a scheduler or off-site storage service.
 
 For a restore drill, provision a separate empty database whose name contains `restore` or `drill`, then run:
 
