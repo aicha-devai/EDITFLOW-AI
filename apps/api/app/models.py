@@ -126,7 +126,7 @@ class ProjectAuditEvent(Base):
     __tablename__ = "project_audit_events"
     __table_args__ = (
         CheckConstraint(
-            "action IN ('member.added','member.role_changed','member.removed')",
+            "action IN ('member.added','member.role_changed','member.removed','ownership.claimed')",
             name="ck_project_audit_action",
         ),
     )
@@ -139,6 +139,7 @@ class ProjectAuditEvent(Base):
     action: Mapped[str] = mapped_column(String(40), nullable=False)
     previous_role: Mapped[str | None] = mapped_column(String(20))
     new_role: Mapped[str | None] = mapped_column(String(20))
+    details: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
