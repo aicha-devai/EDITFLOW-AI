@@ -48,7 +48,7 @@
 (() => {
   const params = new URLSearchParams(location.search);
   const action = params.get("action");
-  const token = params.get("token") || "";
+  const token = params.get("token") || new URLSearchParams(location.hash.slice(1)).get("token") || "";
   // Keep one-time credentials out of the visible URL and subsequent browser history.
   if (token) history.replaceState(null, "", location.pathname + "?action=" + encodeURIComponent(action || ""));
   const api = (localStorage.getItem("editflow-api-base") || "http://localhost:8000").replace(/\/$/, "");
