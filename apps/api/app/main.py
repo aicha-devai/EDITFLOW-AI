@@ -181,7 +181,7 @@ async def register_account(payload: AuthRegisterRequest, db: AsyncSession = Depe
         + _email_link("verify-email", raw_token)
         + "\nIf you did not create this account, you can ignore this message.",
     )
-    return {"message": "Verification email sent. Verify your email before signing in."}
+    return {"message": "If the address can be registered, a verification email will be sent."}
 
 
 @app.post("/v1/auth/verify-email")
