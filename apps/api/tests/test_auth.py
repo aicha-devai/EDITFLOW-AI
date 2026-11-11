@@ -48,6 +48,7 @@ async def test_register_and_login_issue_tokens_for_normalized_email(db_session, 
         db_session,
     )
     assert registered["user"]["email"] == "editor@example.com"
+    assert len(registered["refresh_token"]) >= 32
     assert registered["token_type"] == "bearer"
     assert registered["expires_in"] == 900
     assert decode_access_token(registered["access_token"]) == __import__("uuid").UUID(registered["user"]["id"])
@@ -57,6 +58,7 @@ async def test_register_and_login_issue_tokens_for_normalized_email(db_session, 
         db_session,
     )
     assert logged_in["user"]["id"] == registered["user"]["id"]
+    assert logged_in["refresh_token"] != registered["refresh_token"]
     assert decode_access_token(logged_in["access_token"]) == __import__("uuid").UUID(registered["user"]["id"])
 
 
@@ -183,3 +185,62 @@ async def test_owner_can_assign_update_and_remove_project_member(db_session):
     await remove_project_member(project.id, member.id, db_session, _owned_project=project)
     members = await list_project_members(project.id, db_session, _owned_project=project)
     assert [item["role"] for item in members] == ["owner"]
+
+
+@pytest.mark.asyncio
+async def test_refresh_token_rotation_and_reuse_revokes_session_family(db_session, monkeypatch):
+    from app.config import settings
+    from app.main import register_account, refresh_account
+    from app.schemas import AuthRegisterRequest, RefreshTokenRequest
+    from fastapi import HTTPException
+
+    monkeypatch.setattr(settings, "auth_secret", "test-secret-that-is-long-enough-for-hmac-256")
+    registered = await register_account(
+        AuthRegisterRequest(email="rotate@example.com", password="rotation password long"),
+        db_session,
+    )
+    rotated = await refresh_account(
+        RefreshTokenRequest(refresh_token=registered["refresh_token"]),
+        db_session,
+    )
+    assert rotated["refresh_token"] != registered["refresh_token"]
+    assert decode_access_token(rotated["access_token"]) == __import__("uuid").UUID(rotated["user"]["id"])
+
+    with pytest.raises(HTTPException) as reused:
+        await refresh_account(
+            RefreshTokenRequest(refresh_token=registered["refresh_token"]),
+            db_session,
+        )
+    assert reused.value.status_code == 401
+
+    with pytest.raises(HTTPException) as family_revoked:
+        await refresh_account(
+            RefreshTokenRequest(refresh_token=rotated["refresh_token"]),
+            db_session,
+        )
+    assert family_revoked.value.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_logout_revokes_refresh_session_family(db_session, monkeypatch):
+    from app.config import settings
+    from app.main import register_account, logout_account, refresh_account
+    from app.schemas import AuthRegisterRequest, RefreshTokenRequest
+    from fastapi import HTTPException
+
+    monkeypatch.setattr(settings, "auth_secret", "test-secret-that-is-long-enough-for-hmac-256")
+    registered = await register_account(
+        AuthRegisterRequest(email="logout@example.com", password="logout password long"),
+        db_session,
+    )
+    result = await logout_account(
+        RefreshTokenRequest(refresh_token=registered["refresh_token"]),
+        db_session,
+    )
+    assert result == {"revoked": True}
+    with pytest.raises(HTTPException) as revoked:
+        await refresh_account(
+            RefreshTokenRequest(refresh_token=registered["refresh_token"]),
+            db_session,
+        )
+    assert revoked.value.status_code == 401
