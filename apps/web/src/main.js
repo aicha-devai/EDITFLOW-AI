@@ -169,7 +169,7 @@ function bindStudio() {
 async function createStudioProject(e) {
   e.preventDefault();const title=$("#studio-project-title")?.value.trim();if(!title||state.studioBusy)return;
   state.studioBusy=true;state.studioStatus="Creating project…";render();
-  try{const r=await authorizedFetch(state.apiBase.replace(/\/$/,"")+"/v1/projects",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({title})});const b=await r.json().catch(()=>({}));if(!r.ok)throw new Error(b.detail||"Could not create project.");state.studioProjects.unshift(b);state.studioProjectsLoaded=true;state.studioProjectId=b.id;state.studioStatus="Project created. Choose a source video.";}
+  try{const r=await authorizedFetch(state.apiBase.replace(/\/$/,"")+"/v1/projects",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({title})});const b=await r.json().catch(()=>({}));if(!r.ok)throw new Error(b.detail||"Could not create project.");state.studioProjects.unshift(b);state.studioProjectsLoaded=true;state.studioProjectId=b.id;state.studioAsset=null;state.studioTimelineVersion=null;state.studioJob=null;state.studioStatus="Project created. Choose a source video.";}
   catch(err){state.studioStatus=err.message||"Project creation failed.";}
   finally{state.studioBusy=false;render();}
 }
