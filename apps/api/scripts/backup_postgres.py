@@ -72,7 +72,7 @@ def main() -> None:
             "archive": archive.name,
             "sha256": digest,
             "verified": True,
-        }, indent=2) + "\\n", encoding="utf-8")
+        }, indent=2) + "\n", encoding="utf-8")
         print(json.dumps({"archive": str(archive), "metadata": str(metadata), "sha256": digest, "verified": True}))
     except Exception:
         archive.unlink(missing_ok=True)
