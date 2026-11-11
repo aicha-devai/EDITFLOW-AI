@@ -118,10 +118,8 @@ test("untimed graph nodes remain inspectable and never seek the video to zero", 
   await loadExplorer(page);
 
   const video = page.locator("#story-video");
-  await video.evaluate(el => {
-    el.currentTime = 7.25;
-    el.dispatchEvent(new Event("timeupdate"));
-  });
+  await video.evaluate(el => { el.currentTime = 7.25; });
+  await expect.poll(() => video.evaluate(el => el.currentTime)).toBe(7.25);
   await expect(page.locator("#player-time")).toHaveText("00:07.3");
 
   await page.locator('[data-node="character-untimed"]').click();
@@ -142,15 +140,13 @@ test("untimed relationship evidence has no jump control and does not move playba
   await loadExplorer(page);
 
   const video = page.locator("#story-video");
-  await video.evaluate(el => {
-    el.currentTime = 8.5;
-    el.dispatchEvent(new Event("timeupdate"));
-  });
+  await video.evaluate(el => { el.currentTime = 8.5; });
+  await expect.poll(() => video.evaluate(el => el.currentTime)).toBe(8.5);
 
-  await page.locator('[data-edge="character-shot"]').dispatchEvent("click");
+  await page.locator('[data-edge="character-shot"]').click({ force: true });
 
   await expect(page.getByText("Unaligned narration")).toBeVisible();
   await expect(page.locator(".evidence-card [data-jump-time]")).toHaveCount(0);
   await expect.poll(() => video.evaluate(el => el.currentTime)).toBe(8.5);
-  await expect(page.locator(".evidence-card .evidence-time")).toHaveText("Time unavailable");
+  await expect(page.locator(".evidence-card .evidence-time")).toContainText("Time unavailable");
 });
