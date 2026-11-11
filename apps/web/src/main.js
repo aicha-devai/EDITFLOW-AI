@@ -463,6 +463,8 @@ function saveSession(data, email) {
   if(status) status.textContent=state.userEmail;
   const logout=$("#account-logout");
   if(logout) logout.disabled=false;
+  const invite=$("#send-invitation");
+  if(invite) invite.disabled=false;
 }
 function clearSession() {
   state.accessToken=""; state.refreshToken=""; state.userEmail="";
@@ -473,6 +475,8 @@ function clearSession() {
   if(status) status.textContent="Not signed in";
   const logout=$("#account-logout");
   if(logout) logout.disabled=true;
+  const invite=$("#send-invitation");
+  if(invite) invite.disabled=true;
 }
 function accountMessage(message, error=false) {
   const el=$("#account-message");
