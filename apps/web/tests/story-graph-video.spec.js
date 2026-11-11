@@ -187,6 +187,7 @@ test("account panel exposes resend verification and owner invitation controls", 
     sessionStorage.setItem("editflow-access-token", "test-access-token");
     sessionStorage.setItem("editflow-refresh-token", "test-refresh-token");
     sessionStorage.setItem("editflow-user-email", "owner@example.com");
+    document.cookie = "editflow_csrf=playwright-csrf-token; path=/";
   });
   await page.route("**/v1/auth/resend-verification", async route => {
     expect(route.request().postDataJSON()).toEqual({ email: "owner@example.com" });
@@ -194,7 +195,8 @@ test("account panel exposes resend verification and owner invitation controls", 
   });
   await page.route("**/v1/projects/*/invitations", async route => {
     expect(route.request().method()).toBe("POST");
-    expect(route.request().headers()["authorization"]).toBe("Bearer test-access-token");
+    expect(route.request().headers()["x-editflow-cookie-auth"]).toBe("1");
+    expect(route.request().headers()["x-csrf-token"]).toBe("playwright-csrf-token");
     expect(route.request().postDataJSON()).toEqual({ email: "editor@example.com", role: "editor" });
     await route.fulfill({ status: 202, contentType: "application/json", body: JSON.stringify({ message: "Invitation sent", expires_in_seconds: 604800 }) });
   });
@@ -219,7 +221,7 @@ test("invitation acceptance stores the authenticated session and returns to the 
     }) });
   });
   await page.route("**/v1/invitations/accept", async route => {
-    expect(route.request().headers()["authorization"]).toBe("Bearer accepted-access-token");
+    expect(route.request().headers()["x-editflow-cookie-auth"]).toBe("1");
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ accepted: true, project_id: projectId, role: "editor" }) });
   });
   await page.goto("/auth-action.html?action=accept-invitation#token=invitation-token-012345678901234567890123456789");
@@ -228,6 +230,6 @@ test("invitation acceptance stores the authenticated session and returns to the 
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.getByText("Invitation accepted. Opening EDITFLOW AI…")).toBeVisible();
   await page.waitForURL(url => url.pathname === "/", { timeout: 10000 });
-  await expect.poll(() => page.evaluate(() => sessionStorage.getItem("editflow-access-token"))).toBe("accepted-access-token");
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem("editflow-access-token"))).toBeNull();
   await expect.poll(() => page.evaluate(() => sessionStorage.getItem("editflow-user-email"))).toBe("invited@example.com");
 });
