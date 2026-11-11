@@ -29,7 +29,7 @@ def _send_sync(recipient: str, subject: str, body: str) -> None:
     with smtplib.SMTP(settings.email_smtp_host, settings.email_smtp_port, timeout=15) as smtp:
         smtp.ehlo()
         if settings.email_starttls:
-            smtp.starttls()
+            smtp.starttls(context=ssl.create_default_context())
             smtp.ehlo()
         if settings.email_smtp_username:
             smtp.login(settings.email_smtp_username, settings.email_smtp_password or "")
