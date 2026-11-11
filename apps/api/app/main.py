@@ -139,7 +139,7 @@ def _new_action_token(user_id: UUID, purpose: str, lifetime: timedelta):
 
 
 def _email_link(path: str, token: str) -> str:
-    return f"{settings.email_public_url.rstrip('/')}/auth-action.html?action={path}&token={token}"
+    return f"{settings.email_public_url.rstrip('/')}/auth-action.html?action={path}#token={token}"
 
 async def _send_action_email(db: AsyncSession, token_row: AuthActionToken, recipient: str, subject: str, body: str) -> None:
     try:
