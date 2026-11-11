@@ -75,9 +75,11 @@ test.afterAll(() => {
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
-    sessionStorage.setItem("editflow-access-token", "test-access-token");
-    sessionStorage.setItem("editflow-refresh-token", "test-refresh-token");
-    sessionStorage.setItem("editflow-user-email", "owner@example.com");
+    if (!sessionStorage.getItem("editflow-access-token")) {
+      sessionStorage.setItem("editflow-access-token", "test-access-token");
+      sessionStorage.setItem("editflow-refresh-token", "test-refresh-token");
+      sessionStorage.setItem("editflow-user-email", "owner@example.com");
+    }
   });
   await page.route("**/v1/projects/**/renders/**/story-continuity", route =>
     route.fulfill({
