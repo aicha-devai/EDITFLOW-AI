@@ -23,6 +23,9 @@ const state = {
   loading: false,
   error: "",
   zoom: 1,
+  studioProjects: [], studioProjectsLoaded: false, studioProjectId: "",
+  studioAsset: null, studioTimelineVersion: null, studioJob: null,
+  studioStatus: "", studioBusy: false,
 };
 
 const typeMeta = {
@@ -107,6 +110,7 @@ function render() {
           </form>
           ${state.error ? `<div class="error-line">⚠ ${escapeHtml(state.error)}</div>` : ""}
         </section>
+        ${renderStudio()}
         ${state.graph ? renderExplorer() : renderWelcome()}
       </main>
     </div>
@@ -135,8 +139,66 @@ function render() {
       </section>
     </div>`;
   bindShell();
+  bindStudio();
   if (state.graph) bindExplorer();
 }
+
+function renderStudio() {
+  const options = state.studioProjects.map(p => \`<option value="\${escapeHtml(p.id)}" \${p.id===state.studioProjectId?"selected":""}>\${escapeHtml(p.title)}</option>\`).join("");
+  const asset=state.studioAsset;
+  return \`<section class="studio-panel" aria-label="Project studio">
+    <div class="studio-heading"><div><span class="eyebrow">PROJECT WORKSPACE</span><h2>Create, upload and render</h2><p>Start a project, add a source video and create a real render job.</p></div><span class="studio-step">01 — 03</span></div>
+    \${state.accessToken ? \`
+      <form id="studio-project-form" class="studio-project-form"><label>NEW PROJECT TITLE<input id="studio-project-title" maxlength="200" placeholder="e.g. My first story" required></label><button class="primary-button" type="submit" \${state.studioBusy?"disabled":""}>Create project <span>＋</span></button></form>
+      <div class="studio-controls"><label>ACTIVE PROJECT<select id="studio-project-select" \${state.studioProjects.length?"":"disabled"}><option value="">Choose a project</option>\${options}</select></label>
+      <label class="studio-file-label">SOURCE VIDEO<input id="studio-video-file" type="file" accept=".mp4,.m4v,.mov,.webm,video/mp4,video/quicktime,video/webm"></label>
+      <div class="studio-actions"><button id="studio-upload" class="secondary-button" type="button" \${!state.studioProjectId||state.studioBusy?"disabled":""}>Upload video to storage</button><button id="studio-render" class="primary-button" type="button" \${!asset||!state.studioTimelineVersion||state.studioBusy?"disabled":""}>Start render <span>→</span></button></div></div>
+      \${asset?\`<div class="studio-asset" data-testid="uploaded-asset"><span class="studio-check">✓</span><div><strong>\${escapeHtml(asset.original_filename)}</strong><small>\${(asset.size_bytes/1048576).toFixed(2)} MB · \${Number(asset.duration_seconds).toFixed(2)} sec · SHA-256 \${escapeHtml(asset.checksum_sha256.slice(0,16))}… · Timeline v\${state.studioTimelineVersion}</small></div></div>\`:""}
+      \${state.studioJob?\`<div class="studio-job" data-testid="render-job"><div><strong>Render \${escapeHtml(state.studioJob.status)}</strong><small>\${escapeHtml(state.studioJob.job_id)}</small></div><div class="studio-progress"><i style="width:\${Math.max(0,Math.min(100,Number(state.studioJob.progress_percent)||0))}%"></i></div><b>\${Number(state.studioJob.progress_percent)||0}%</b></div>\`:""}
+      <p id="studio-status" class="studio-status" role="status">\${escapeHtml(state.studioStatus||"Create a project to begin. Uploaded media is validated and linked to an immutable timeline version.")}</p>
+    \`:\`<div class="studio-locked">Sign in with a verified account to create projects and upload source videos.</div>\`}
+  </section>\`;
+}
+function bindStudio() {
+  $("#studio-project-form")?.addEventListener("submit",createStudioProject);
+  $("#studio-project-select")?.addEventListener("change",async e=>{state.studioProjectId=e.target.value;state.studioAsset=null;state.studioTimelineVersion=null;state.studioJob=null;render();if(state.studioProjectId)await loadStudioAssets();});
+  $("#studio-upload")?.addEventListener("click",uploadStudioVideo);
+  $("#studio-render")?.addEventListener("click",startStudioRender);
+  if(state.accessToken&&!state.studioProjectsLoaded)loadStudioProjects();
+}
+async function createStudioProject(e) {
+  e.preventDefault();const title=$("#studio-project-title")?.value.trim();if(!title||state.studioBusy)return;
+  state.studioBusy=true;state.studioStatus="Creating project…";render();
+  try{const r=await authorizedFetch(state.apiBase.replace(/\/$/,"")+"/v1/projects",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({title})});const b=await r.json().catch(()=>({}));if(!r.ok)throw new Error(b.detail||"Could not create project.");state.studioProjects.unshift(b);state.studioProjectsLoaded=true;state.studioProjectId=b.id;state.studioStatus="Project created. Choose a source video.";}
+  catch(err){state.studioStatus=err.message||"Project creation failed.";}
+  finally{state.studioBusy=false;render();}
+}
+async function loadStudioProjects() {
+  state.studioProjectsLoaded=true;
+  try{const r=await authorizedFetch(state.apiBase.replace(/\/$/,"")+"/v1/projects");const b=await r.json().catch(()=>[]);if(!r.ok)throw new Error(b.detail||"Could not load projects.");state.studioProjects=Array.isArray(b)?b:[];if(!state.studioProjectId&&state.studioProjects.length)state.studioProjectId=state.studioProjects[0].id;render();if(state.studioProjectId)await loadStudioAssets();}
+  catch(err){state.studioStatus=err.message||"Could not load projects.";render();}
+}
+async function loadStudioAssets() {
+  if(!state.studioProjectId)return;
+  try{const base=state.apiBase.replace(/\/$/,"");const r=await authorizedFetch(base+"/v1/projects/"+encodeURIComponent(state.studioProjectId)+"/assets");const b=await r.json().catch(()=>[]);if(!r.ok)throw new Error(b.detail||"Could not load project assets.");if(Array.isArray(b)&&b.length){state.studioAsset=b[0];const vr=await authorizedFetch(base+"/v1/projects/"+encodeURIComponent(state.studioProjectId)+"/versions");const versions=await vr.json().catch(()=>[]);const current=Array.isArray(versions)?versions.find(v=>v.id===state.studioProjects.find(p=>p.id===state.studioProjectId)?.current_version_id):null;state.studioTimelineVersion=current?.version||null;render();}}
+  catch(err){state.studioStatus=err.message||"Could not load assets.";render();}
+}
+async function uploadStudioVideo() {
+  const file=$("#studio-video-file")?.files?.[0];if(!file||!state.studioProjectId||state.studioBusy){state.studioStatus="Choose a video file and an active project first.";const el=$("#studio-status");if(el)el.textContent=state.studioStatus;return;}
+  state.studioBusy=true;state.studioStatus="Uploading, hashing and validating source video…";const el=$("#studio-status");if(el)el.textContent=state.studioStatus;$("#studio-upload")?.setAttribute("disabled","disabled");$("#studio-render")?.setAttribute("disabled","disabled");
+  try{const form=new FormData();form.append("file",file,file.name);const r=await authorizedFetch(state.apiBase.replace(/\/$/,"")+"/v1/projects/"+encodeURIComponent(state.studioProjectId)+"/assets",{method:"POST",body:form});const b=await r.json().catch(()=>({}));if(!r.ok)throw new Error(b.detail||"Video upload failed.");state.studioAsset=b.asset;state.studioTimelineVersion=b.timeline?.version||null;const project=state.studioProjects.find(p=>p.id===state.studioProjectId);if(project)project.current_version_id=b.timeline?.version_id;state.studioStatus="Upload verified and stored. The asset is linked to a new timeline version.";}
+  catch(err){state.studioStatus=err.message||"Video upload failed.";}
+  finally{state.studioBusy=false;render();}
+}
+async function startStudioRender() {
+  if(!state.studioProjectId||!state.studioTimelineVersion||state.studioBusy)return;
+  state.studioBusy=true;state.studioStatus="Submitting render job…";const el=$("#studio-status");if(el)el.textContent=state.studioStatus;$("#studio-upload")?.setAttribute("disabled","disabled");$("#studio-render")?.setAttribute("disabled","disabled");
+  try{const base=state.apiBase.replace(/\/$/,"");const r=await authorizedFetch(base+"/v1/projects/"+encodeURIComponent(state.studioProjectId)+"/renders",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({timeline_version:state.studioTimelineVersion,render_profile:{preset:"ultrafast",crf:24},request_key:"web-"+crypto.randomUUID()})});const b=await r.json().catch(()=>({}));if(!r.ok)throw new Error(b.detail||"Could not start render.");state.studioJob={job_id:b.job_id,status:b.status,progress_percent:0};render();
+    for(let i=0;i<2400;i++){await new Promise(resolve=>setTimeout(resolve,1500));const poll=await authorizedFetch(base+"/v1/projects/"+encodeURIComponent(state.studioProjectId)+"/renders/"+encodeURIComponent(b.job_id));const job=await poll.json().catch(()=>({}));if(!poll.ok)throw new Error(job.detail||"Could not retrieve render status.");state.studioJob=job;state.studioStatus=job.status==="succeeded"?"Render complete. Loading the video and evidence graph…":job.status==="failed"?(job.error_message||"Render failed."):job.status==="cancelled"?"Render was cancelled.":"Render in progress…";const j=document.querySelector("[data-testid='render-job']");if(j){const s=j.querySelector("strong");if(s)s.textContent="Render "+job.status;const bar=j.querySelector(".studio-progress i");if(bar)bar.style.width=(Number(job.progress_percent)||0)+"%";const pct=j.querySelector("b");if(pct)pct.textContent=(Number(job.progress_percent)||0)+"%";}const st=$("#studio-status");if(st)st.textContent=state.studioStatus;if(["succeeded","failed","cancelled"].includes(job.status)){if(job.status==="succeeded"){state.projectId=state.studioProjectId;state.jobId=b.job_id;await loadGraph();}break;}}
+  }catch(err){state.studioStatus=err.message||"Render request failed.";}
+  finally{state.studioBusy=false;render();}
+}
+
 function renderWelcome() {
   return `
     <section class="welcome">
