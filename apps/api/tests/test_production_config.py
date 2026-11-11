@@ -18,7 +18,7 @@ def _set_valid_production(monkeypatch):
         "cors_origins": "https://app.example.com",
         "storage_backend": "s3",
         "s3_bucket": "editflow-production",
-        "database_url": "postgresql+asyncpg://editflow:secret@db.example.com/editflow",
+        "database_url": "postgresql+asyncpg://editflow:secret@db.example.com/editflow?ssl=require",
     }
     for key, value in values.items():
         monkeypatch.setattr(settings, key, value)
@@ -37,7 +37,8 @@ def test_production_configuration_accepts_secure_values(monkeypatch):
         ("email_starttls", False, "SMTP transport"),
         ("cors_origins", "*", "HTTPS origins"),
         ("storage_backend", "local", "S3-compatible"),
-        ("database_url", "postgresql+asyncpg://u:p@localhost/db", "non-local"),
+        ("database_url", "postgresql+asyncpg://u:p@localhost/db?ssl=require", "non-local"),
+        ("database_url", "postgresql+asyncpg://u:p@db.example.com/db", "require TLS"),
     ],
 )
 def test_production_configuration_fails_closed(monkeypatch, field, value, expected):
