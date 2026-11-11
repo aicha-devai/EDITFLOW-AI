@@ -162,7 +162,8 @@ async def register_account(payload: AuthRegisterRequest, db: AsyncSession = Depe
     await enforce_rate_limit(db, [f"register:ip:{client_ip}"], settings.auth_register_limit, settings.auth_register_window_seconds)
     existing = await db.scalar(select(User).where(User.email == payload.email))
     if existing is not None:
-        raise HTTPException(409, "An account with this email already exists")
+        # Keep registration responses identical for existing and new addresses.
+        return {"message": "If the address can be registered, a verification email will be sent."}
     user = User(email=payload.email, password_hash=hash_password(payload.password), is_email_verified=False)
     db.add(user)
     try:
@@ -172,7 +173,7 @@ async def register_account(payload: AuthRegisterRequest, db: AsyncSession = Depe
         await db.commit()
     except IntegrityError:
         await db.rollback()
-        raise HTTPException(409, "An account with this email already exists")
+        return {"message": "If the address can be registered, a verification email will be sent."}
     await _send_action_email(
         db, token_row, user.email,
         "Verify your EDITFLOW AI email",
@@ -287,7 +288,7 @@ async def login_account(payload: AuthLoginRequest, db: AsyncSession = Depends(ge
     if user is None or not user.is_active or not verify_password(payload.password, user.password_hash):
         raise HTTPException(401, "Invalid email or password", headers={"WWW-Authenticate": "Bearer"})
     if not user.is_email_verified:
-        raise HTTPException(403, "Verify your email before signing in")
+        raise HTTPException(401, "Invalid email or password", headers={"WWW-Authenticate": "Bearer"})
     access_token = create_access_token(user.id)
     refresh_token, session = _new_refresh_session(user.id)
     db.add(session)
