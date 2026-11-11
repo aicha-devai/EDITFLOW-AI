@@ -1,8 +1,12 @@
 from uuid import UUID, uuid4
 from datetime import datetime, timedelta, timezone
+import asyncio
 import hashlib
+import os
 import secrets
-from fastapi import FastAPI, Depends, HTTPException, Request, Response
+import tempfile
+from pathlib import Path
+from fastapi import FastAPI, Depends, HTTPException, Request, Response, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse, JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,10 +15,10 @@ from app.db import get_db
 from app.rendering import create_render_job, get_render_job, request_render_cancellation, RenderJobNotFound
 from sqlalchemy import select, or_, delete, update
 from sqlalchemy.exc import IntegrityError
-from app.models import Project, RenderJob, User, ProjectMember, UserSession, ProjectAuditEvent, AuthActionToken, ProjectInvitation
+from app.models import Asset, Project, RenderJob, TimelineVersion, User, ProjectMember, UserSession, ProjectAuditEvent, AuthActionToken, ProjectInvitation
 from app.schemas import (
     ProjectCreate, SaveTimelineRequest, RestoreRequest, CreateRenderRequest,
-    QCCriticApprovalRequest, AuthRegisterRequest, AuthLoginRequest, ProjectMemberUpsert, RefreshTokenRequest,
+    QCCriticApprovalRequest, AuthRegisterRequest, AuthLoginRequest, ProjectMemberUpsert, RefreshTokenRequest, TimelineDocument,
     EmailOnlyRequest, ActionTokenRequest, PasswordResetRequest, ProjectInvitationCreate,
 )
 from app.qc_critic import (
@@ -29,6 +33,7 @@ from app.storage import create_object_storage, LocalObjectStorage, S3ObjectStora
 from app.auth import get_current_user, hash_password, verify_password, create_access_token, generate_refresh_token, hash_refresh_token
 from app.rate_limit import enforce_rate_limit
 from app.emailer import send_email
+from app.media_probe import probe_media, MediaProbeError
 
 app = FastAPI(title=settings.api_title, version="0.1.0")
 
@@ -389,6 +394,141 @@ async def logout_account(payload: RefreshTokenRequest | None = None, db: AsyncSe
 @app.get("/v1/auth/me")
 async def get_authenticated_account(current_user: User = Depends(get_current_user)):
     return {"id": str(current_user.id), "email": current_user.email, "is_active": current_user.is_active, "is_email_verified": current_user.is_email_verified}
+
+
+
+
+MAX_SOURCE_VIDEO_BYTES = 512 * 1024 * 1024
+ALLOWED_VIDEO_TYPES = {
+    "video/mp4": {".mp4", ".m4v"},
+    "video/quicktime": {".mov"},
+    "video/webm": {".webm"},
+}
+
+
+@app.get("/v1/projects")
+async def list_projects(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    rows = (await db.execute(
+        select(Project).where(Project.owner_id == current_user.id).order_by(Project.created_at.desc())
+    )).scalars().all()
+    return [{"id": str(row.id), "title": row.title, "current_version_id": str(row.current_version_id) if row.current_version_id else None,
+             "created_at": row.created_at} for row in rows]
+
+
+@app.get("/v1/projects/{project_id}/assets")
+async def list_project_assets(project_id: UUID, db: AsyncSession = Depends(get_db),
+                              _project: Project = Depends(require_project_access)):
+    rows = (await db.execute(
+        select(Asset).where(Asset.project_id == project_id).order_by(Asset.created_at.desc())
+    )).scalars().all()
+    return [{
+        "id": str(row.id), "original_filename": row.original_filename,
+        "mime_type": row.mime_type, "size_bytes": row.size_bytes,
+        "duration_seconds": row.duration_seconds, "width": row.width, "height": row.height,
+        "checksum_sha256": row.checksum_sha256, "created_at": row.created_at,
+    } for row in rows]
+
+
+@app.post("/v1/projects/{project_id}/assets", status_code=201)
+async def upload_project_video(project_id: UUID, file: UploadFile = File(...),
+                               db: AsyncSession = Depends(get_db),
+                               project: Project = Depends(require_project_editor)):
+    """Stream, validate and checksum a source video before linking it to a timeline."""
+    content_type = (file.content_type or "").lower().split(";", 1)[0].strip()
+    extension = Path(file.filename or "").suffix.lower()
+    if content_type not in ALLOWED_VIDEO_TYPES or extension not in ALLOWED_VIDEO_TYPES[content_type]:
+        raise HTTPException(415, "Supported source videos are MP4, MOV and WebM with matching file extensions")
+    safe_name = Path(file.filename or "source-video").name[:255]
+    suffix = extension
+    temp_path = None
+    asset_id = uuid4()
+    object_key = f"uploads/{project_id}/{asset_id}{suffix}"
+    digest = hashlib.sha256()
+    total = 0
+    signature = b""
+    try:
+        with tempfile.NamedTemporaryFile(prefix="editflow-upload-", suffix=suffix, delete=False) as temp:
+            temp_path = temp.name
+            while True:
+                chunk = await file.read(1024 * 1024)
+                if not chunk:
+                    break
+                total += len(chunk)
+                if total > MAX_SOURCE_VIDEO_BYTES:
+                    raise HTTPException(413, "Video exceeds the 512 MiB upload limit")
+                if len(signature) < 16:
+                    signature += chunk[:16 - len(signature)]
+                digest.update(chunk)
+                temp.write(chunk)
+        if total <= 0:
+            raise HTTPException(400, "Uploaded video is empty")
+        is_mp4 = len(signature) >= 12 and signature[4:8] == b"ftyp"
+        is_webm = signature.startswith(b"\x1aE\xdf\xa3")
+        if (content_type in {"video/mp4", "video/quicktime"} and not is_mp4) or (content_type == "video/webm" and not is_webm):
+            raise HTTPException(415, "The uploaded file signature does not match its declared video type")
+        try:
+            info = await probe_media(temp_path, timeout_seconds=45)
+        except MediaProbeError as exc:
+            raise HTTPException(422, f"Video could not be decoded or probed: {str(exc)[:300]}") from exc
+        if info.duration_seconds > 4 * 60 * 60:
+            raise HTTPException(413, "Source videos longer than four hours are not supported")
+        storage = create_object_storage(settings)
+        await asyncio.to_thread(storage.put_file, temp_path, object_key)
+        asset = Asset(
+            id=asset_id, project_id=project_id, object_key=object_key,
+            checksum_sha256=digest.hexdigest(), original_filename=safe_name,
+            mime_type=content_type, size_bytes=total, duration_seconds=info.duration_seconds,
+            width=info.width, height=info.height,
+        )
+        db.add(asset)
+        await db.flush()
+        latest = None
+        if project.current_version_id:
+            latest = await db.scalar(select(TimelineVersion).where(
+                TimelineVersion.id == project.current_version_id,
+                TimelineVersion.project_id == project_id,
+            ))
+        clips = list(latest.timeline_json.get("clips", [])) if latest else []
+        clips.append({
+            "id": str(uuid4()), "asset_id": str(asset_id), "track_id": "video-1",
+            "timeline_start": max((float(clip.get("timeline_start", 0)) +
+                float(clip.get("source_out", 0)) - float(clip.get("source_in", 0)) for clip in clips), default=0),
+            "source_in": 0, "source_out": info.duration_seconds,
+            "transform": {}, "audio_gain_db": 0,
+        })
+        timeline_data = {
+            "schema_version": "0.1", "project_id": str(project_id),
+            "version": 0, "sequence": (latest.timeline_json.get("sequence", {}) if latest else {
+                "width": 1080, "height": 1920, "fps": 30,
+            }),
+            "clips": clips, "editorial_notes": (latest.timeline_json.get("editorial_notes", []) if latest else []),
+            "qc_intent": (latest.timeline_json.get("qc_intent", []) if latest else []),
+        }
+        timeline = TimelineDocument.model_validate(timeline_data)
+        async with db.begin():
+            version, created = await save_timeline(
+                db, project_id, timeline, latest.version if latest else 0,
+                message=f"Added source video: {safe_name}",
+                idempotency_key=f"upload-{asset_id}",
+            )
+        return {
+            "asset": {
+                "id": str(asset.id), "original_filename": asset.original_filename,
+                "mime_type": asset.mime_type, "size_bytes": asset.size_bytes,
+                "duration_seconds": asset.duration_seconds, "width": asset.width, "height": asset.height,
+                "checksum_sha256": asset.checksum_sha256,
+            },
+            "timeline": {"version": version.version, "version_id": str(version.id), "created": created},
+        }
+    except HTTPException:
+        raise
+    except StorageError as exc:
+        raise HTTPException(502, "Source video could not be stored in object storage") from exc
+    finally:
+        await file.close()
+        if temp_path:
+            Path(temp_path).unlink(missing_ok=True)
+
 
 @app.post("/v1/projects", status_code=201)
 async def create_project(payload: ProjectCreate, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
