@@ -21,6 +21,10 @@ openssl rand -hex 32
 ```
 
 Optional settings:
+- `EDITFLOW_AUTH_LOGIN_LIMIT`: failed/successful login requests per IP per window; default 10.
+- `EDITFLOW_AUTH_REGISTER_LIMIT`: registration requests per IP per window; default 5.
+- `EDITFLOW_AUTH_LOGIN_WINDOW_SECONDS`: login window; default 900 seconds.
+- `EDITFLOW_AUTH_REGISTER_WINDOW_SECONDS`: registration window; default 3600 seconds.
 
 - `EDITFLOW_AUTH_ACCESS_TOKEN_SECONDS`: 300–3600 seconds; default 900.
 - `EDITFLOW_AUTH_REFRESH_TOKEN_DAYS`: 1–90 days; default 30.
@@ -45,10 +49,17 @@ Migration `0005_auth_ownership` adds nullable `projects.owner_id` so existing pr
 
 The current implementation establishes authentication, refresh-session rotation, owner/editor/viewer authorization, and automated tests. Before a public multi-user launch, complete and verify:
 
-1. Login/register rate limiting and abuse monitoring.
+1. Abuse monitoring, alerting, and adaptive controls beyond the baseline login/register rate limits now implemented.
 2. Email verification and secure password-reset flows.
 3. Email-based invitations and membership audit history.
 4. Administrative recovery/ownership transfer for legacy projects.
 5. Production HTTPS, secret-manager configuration, backups, and security monitoring.
 
 The API should not be considered public-launch ready until these controls are completed and reviewed.
+
+
+## Authentication rate limiting
+
+Migration `0008_auth_rate_limits` adds persistent PostgreSQL fixed-window counters. Login attempts are counted against both the source IP and the IP/email pair; registration attempts are counted against the source IP. Scope identifiers are HMAC-SHA256 digests keyed by the authentication secret, so raw email addresses and IP addresses are not stored in the limiter table. Requests over the configured limit receive HTTP 429 with a `Retry-After` header. Counters are shared across API workers because they are stored in PostgreSQL.
+
+The current implementation uses the ASGI connection's client address. If the API is deployed behind a reverse proxy, configure the proxy/server to set trusted client addresses correctly; do not trust arbitrary forwarded-IP headers. Operational abuse monitoring, alerting, and adaptive risk controls remain deployment tasks.
