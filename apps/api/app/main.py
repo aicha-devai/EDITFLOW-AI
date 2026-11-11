@@ -42,7 +42,12 @@ async def validate_runtime_configuration():
 async def add_security_headers(request: Request, call_next):
     unsafe = request.method.upper() not in {"GET", "HEAD", "OPTIONS", "TRACE"}
     has_session_cookie = bool(request.cookies.get("editflow_access") or request.cookies.get("editflow_refresh"))
-    if unsafe and has_session_cookie:
+    public_cookie_independent = request.url.path in {
+        "/v1/auth/register", "/v1/auth/request-password-reset",
+        "/v1/auth/resend-verification", "/v1/auth/verify-email",
+        "/v1/auth/reset-password",
+    }
+    if unsafe and has_session_cookie and not public_cookie_independent:
         csrf_cookie = request.cookies.get("editflow_csrf", "")
         csrf_header = request.headers.get("x-csrf-token", "")
         if not csrf_cookie or not csrf_header or not secrets.compare_digest(csrf_cookie, csrf_header):
@@ -327,7 +332,7 @@ async def login_account(payload: AuthLoginRequest, db: AsyncSession = Depends(ge
 
 
 @app.post("/v1/auth/refresh")
-async def refresh_account(payload: RefreshTokenRequest | None = None, request: Request = None, db: AsyncSession = Depends(get_db)):
+async def refresh_account(payload: RefreshTokenRequest | None = None, db: AsyncSession = Depends(get_db), request: Request = None):
     raw_refresh = payload.refresh_token if payload else (request.cookies.get("editflow_refresh") if request else None)
     if not raw_refresh:
         raise HTTPException(401, "Refresh token is required")
@@ -366,7 +371,7 @@ async def refresh_account(payload: RefreshTokenRequest | None = None, request: R
 
 
 @app.post("/v1/auth/logout")
-async def logout_account(payload: RefreshTokenRequest | None = None, request: Request = None, db: AsyncSession = Depends(get_db)):
+async def logout_account(payload: RefreshTokenRequest | None = None, db: AsyncSession = Depends(get_db), request: Request = None):
     raw_refresh = payload.refresh_token if payload else (request.cookies.get("editflow_refresh") if request else None)
     if raw_refresh:
         session = await db.scalar(select(UserSession).where(
