@@ -7,10 +7,11 @@ from app.config import settings
 from app.db import get_db
 from app.rendering import create_render_job, get_render_job, request_render_cancellation, RenderJobNotFound
 from sqlalchemy import select
-from app.models import Project, RenderJob
+from sqlalchemy.exc import IntegrityError
+from app.models import Project, RenderJob, User
 from app.schemas import (
     ProjectCreate, SaveTimelineRequest, RestoreRequest, CreateRenderRequest,
-    QCCriticApprovalRequest,
+    QCCriticApprovalRequest, AuthRegisterRequest, AuthLoginRequest,
 )
 from app.qc_critic import (
     generate_qc_critic_proposals, approve_qc_intent_proposals,
@@ -21,6 +22,7 @@ from app.versioning import (
     VersionConflict, ProjectNotFound,
 )
 from app.storage import create_object_storage, LocalObjectStorage, S3ObjectStorage, StorageError
+from app.auth import get_current_user, hash_password, verify_password, create_access_token
 
 app = FastAPI(title=settings.api_title, version="0.1.0")
 _allowed_origins = [origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()]
@@ -36,6 +38,66 @@ app.add_middleware(
 async def health():
     return {"status": "ok"}
 
+
+async def require_owned_project(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Project:
+    project = await db.scalar(select(Project).where(
+        Project.id == project_id,
+        Project.owner_id == current_user.id,
+    ))
+    if project is None:
+        # Do not reveal whether another user's project exists.
+        raise HTTPException(404, "Project not found")
+    return project
+
+
+@app.post("/v1/auth/register", status_code=201)
+async def register_account(payload: AuthRegisterRequest, db: AsyncSession = Depends(get_db)):
+    if not settings.auth_secret or len(settings.auth_secret.encode("utf-8")) < 32:
+        raise HTTPException(503, "Authentication is not configured")
+    existing = await db.scalar(select(User).where(User.email == payload.email))
+    if existing is not None:
+        raise HTTPException(409, "An account with this email already exists")
+    user = User(email=payload.email, password_hash=hash_password(payload.password))
+    db.add(user)
+    try:
+        await db.flush()
+        access_token = create_access_token(user.id)
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(409, "An account with this email already exists")
+    except Exception:
+        await db.rollback()
+        raise
+    return {
+        "user": {"id": str(user.id), "email": user.email},
+        "access_token": access_token,
+        "token_type": "bearer",
+        "expires_in": settings.auth_access_token_seconds,
+    }
+
+
+@app.post("/v1/auth/login")
+async def login_account(payload: AuthLoginRequest, db: AsyncSession = Depends(get_db)):
+    user = await db.scalar(select(User).where(User.email == payload.email))
+    if user is None or not user.is_active or not verify_password(payload.password, user.password_hash):
+        raise HTTPException(401, "Invalid email or password", headers={"WWW-Authenticate": "Bearer"})
+    return {
+        "user": {"id": str(user.id), "email": user.email},
+        "access_token": create_access_token(user.id),
+        "token_type": "bearer",
+        "expires_in": settings.auth_access_token_seconds,
+    }
+
+
+@app.get("/v1/auth/me")
+async def get_authenticated_account(current_user: User = Depends(get_current_user)):
+    return {"id": str(current_user.id), "email": current_user.email, "is_active": current_user.is_active}
+
 @app.post("/v1/projects", status_code=201)
 async def create_project(payload: ProjectCreate, db: AsyncSession = Depends(get_db)):
     project = Project(title=payload.title.strip())
@@ -45,7 +107,7 @@ async def create_project(payload: ProjectCreate, db: AsyncSession = Depends(get_
     return {"id": str(project.id), "title": project.title, "current_version_id": None}
 
 @app.post("/v1/projects/{project_id}/timeline")
-async def save_project_timeline(project_id: UUID, payload: SaveTimelineRequest, db: AsyncSession = Depends(get_db)):
+async def save_project_timeline(project_id: UUID, payload: SaveTimelineRequest, db: AsyncSession = Depends(get_db), _owned_project: Project = Depends(require_owned_project)):
     try:
         async with db.begin():
             row, created = await save_timeline(
@@ -62,7 +124,7 @@ async def save_project_timeline(project_id: UUID, payload: SaveTimelineRequest, 
         raise HTTPException(422, str(exc))
 
 @app.get("/v1/projects/{project_id}/versions")
-async def get_versions(project_id: UUID, db: AsyncSession = Depends(get_db)):
+async def get_versions(project_id: UUID, db: AsyncSession = Depends(get_db), _owned_project: Project = Depends(require_owned_project)):
     rows = await list_versions(db, project_id)
     return [{
         "id": str(r.id), "version": r.version, "parent_version_id": str(r.parent_version_id) if r.parent_version_id else None,
@@ -71,14 +133,14 @@ async def get_versions(project_id: UUID, db: AsyncSession = Depends(get_db)):
     } for r in rows]
 
 @app.get("/v1/projects/{project_id}/versions/compare")
-async def compare_project_versions(project_id: UUID, from_version: int, to_version: int, db: AsyncSession = Depends(get_db)):
+async def compare_project_versions(project_id: UUID, from_version: int, to_version: int, db: AsyncSession = Depends(get_db), _owned_project: Project = Depends(require_owned_project)):
     try:
         return await compare_versions(db, project_id, from_version, to_version)
     except LookupError as exc:
         raise HTTPException(404, str(exc))
 
 @app.post("/v1/projects/{project_id}/versions/{source_version}/restore")
-async def restore_project_version(project_id: UUID, source_version: int, payload: RestoreRequest, db: AsyncSession = Depends(get_db)):
+async def restore_project_version(project_id: UUID, source_version: int, payload: RestoreRequest, db: AsyncSession = Depends(get_db), _owned_project: Project = Depends(require_owned_project)):
     try:
         async with db.begin():
             row, created = await restore_version(
@@ -95,7 +157,7 @@ async def restore_project_version(project_id: UUID, source_version: int, payload
 
 
 @app.post("/v1/projects/{project_id}/renders", status_code=202)
-async def create_project_render(project_id: UUID, payload: CreateRenderRequest, db: AsyncSession = Depends(get_db)):
+async def create_project_render(project_id: UUID, payload: CreateRenderRequest, db: AsyncSession = Depends(get_db), _owned_project: Project = Depends(require_owned_project)):
     try:
         async with db.begin():
             job, created = await create_render_job(
@@ -120,7 +182,7 @@ async def create_project_render(project_id: UUID, payload: CreateRenderRequest, 
         raise HTTPException(422, str(exc))
 
 @app.get("/v1/projects/{project_id}/renders/{job_id}")
-async def get_project_render(project_id: UUID, job_id: UUID, db: AsyncSession = Depends(get_db)):
+async def get_project_render(project_id: UUID, job_id: UUID, db: AsyncSession = Depends(get_db), _owned_project: Project = Depends(require_owned_project)):
     try:
         job = await get_render_job(db, project_id, job_id)
         return {
@@ -146,7 +208,7 @@ async def get_project_render(project_id: UUID, job_id: UUID, db: AsyncSession = 
 
 
 @app.get("/v1/projects/{project_id}/renders/{job_id}/media")
-async def stream_project_render_media(project_id: UUID, job_id: UUID, db: AsyncSession = Depends(get_db)):
+async def stream_project_render_media(project_id: UUID, job_id: UUID, db: AsyncSession = Depends(get_db), _owned_project: Project = Depends(require_owned_project)):
     """Serve the immutable rendered MP4 with browser seeking / HTTP range support."""
     job = await db.scalar(select(RenderJob).where(
         RenderJob.id == job_id, RenderJob.project_id == project_id
@@ -177,7 +239,7 @@ async def stream_project_render_media(project_id: UUID, job_id: UUID, db: AsyncS
         raise HTTPException(404, "Rendered media could not be resolved") from exc
 
 @app.post("/v1/projects/{project_id}/renders/{job_id}/cancel")
-async def cancel_project_render(project_id: UUID, job_id: UUID, db: AsyncSession = Depends(get_db)):
+async def cancel_project_render(project_id: UUID, job_id: UUID, db: AsyncSession = Depends(get_db), _owned_project: Project = Depends(require_owned_project)):
     try:
         async with db.begin():
             job = await request_render_cancellation(db, project_id, job_id)
@@ -191,7 +253,7 @@ async def cancel_project_render(project_id: UUID, job_id: UUID, db: AsyncSession
 
 
 @app.get("/v1/projects/{project_id}/renders/{job_id}/qc-critic")
-async def get_qc_critic_suggestions(project_id: UUID, job_id: UUID, db: AsyncSession = Depends(get_db)):
+async def get_qc_critic_suggestions(project_id: UUID, job_id: UUID, db: AsyncSession = Depends(get_db), _owned_project: Project = Depends(require_owned_project)):
     job = await db.scalar(select(RenderJob).where(
         RenderJob.id == job_id, RenderJob.project_id == project_id
     ))
@@ -207,7 +269,7 @@ async def get_qc_critic_suggestions(project_id: UUID, job_id: UUID, db: AsyncSes
 
 
 @app.get("/v1/projects/{project_id}/renders/{job_id}/story-continuity")
-async def get_story_continuity_graph(project_id: UUID, job_id: UUID, db: AsyncSession = Depends(get_db)):
+async def get_story_continuity_graph(project_id: UUID, job_id: UUID, db: AsyncSession = Depends(get_db), _owned_project: Project = Depends(require_owned_project)):
     job = await db.scalar(select(RenderJob).where(
         RenderJob.id == job_id, RenderJob.project_id == project_id
     ))
