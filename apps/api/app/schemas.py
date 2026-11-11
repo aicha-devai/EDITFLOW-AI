@@ -109,3 +109,35 @@ class QCCriticApprovalRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     proposal_ids: list[str] = Field(min_length=1, max_length=100)
     expected_version: int = Field(ge=1)
+
+
+class EmailOnlyRequest(BaseModel):
+    email: str = Field(min_length=5, max_length=320)
+
+    @model_validator(mode="after")
+    def normalize_and_validate_email(self):
+        self.email = self.email.strip().lower()
+        if not re.fullmatch(r"[^\\s@]+@[^\\s@]+\\.[^\\s@]+", self.email):
+            raise ValueError("A valid email address is required")
+        return self
+
+
+class ActionTokenRequest(BaseModel):
+    token: str = Field(min_length=32, max_length=256)
+
+
+class PasswordResetRequest(BaseModel):
+    token: str = Field(min_length=32, max_length=256)
+    new_password: str = Field(min_length=12, max_length=128)
+
+
+class ProjectInvitationCreate(BaseModel):
+    email: str = Field(min_length=5, max_length=320)
+    role: Literal["editor", "viewer"]
+
+    @model_validator(mode="after")
+    def normalize_and_validate_email(self):
+        self.email = self.email.strip().lower()
+        if not re.fullmatch(r"[^\\s@]+@[^\\s@]+\\.[^\\s@]+", self.email):
+            raise ValueError("A valid email address is required")
+        return self
