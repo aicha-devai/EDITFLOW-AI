@@ -38,3 +38,15 @@
 .graph-node.node-playing .node-halo{opacity:.48!important;stroke:#e2d3ff;stroke-width:2;stroke-dasharray:3 3}
 .graph-node.node-playing .node-dot{stroke:#fff;stroke-width:2.5}
 @media(max-width:760px){.evidence-marker{flex-basis:130px}.evidence-track-heading{align-items:flex-start;flex-direction:column;gap:3px}}
+
+
+/* Account recovery and collaboration controls */
+.settings-modal .account-links{display:flex;justify-content:space-between;gap:12px;margin:8px 0 14px}
+.settings-modal .text-button{border:0;background:transparent;color:#bba5f1;font:11px 'DM Sans',sans-serif;padding:5px 0;cursor:pointer}
+.settings-modal .text-button:hover{text-decoration:underline}
+.settings-modal .collaboration-panel{margin:18px 0;padding:15px;border:1px solid #2d3749;border-radius:10px;background:#111925}
+.settings-modal .collaboration-panel .modal-head{margin:0 0 10px}
+.settings-modal .collaboration-panel h2{font-size:15px}
+.settings-modal select{display:block;width:100%;height:37px;margin-top:6px;border:1px solid #30394a;border-radius:7px;background:#0d131d;padding:0 10px;color:#e6eaf2;font:11px 'DM Sans',sans-serif}
+.settings-modal select:focus{outline:none;border-color:#8f77c8}
+.settings-modal .collaboration-panel .muted{margin:10px 0 0;line-height:1.5}
