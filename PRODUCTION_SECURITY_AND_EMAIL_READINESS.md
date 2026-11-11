@@ -12,7 +12,7 @@ This review reflects repository code and CI evidence only. It does not assert th
 - New invitations revoke prior unaccepted invitations for the same project and email; invitation creation is rate-limited by project, recipient, and request IP.
 - Registration responses no longer disclose whether an email already has an account.
 - Authentication and invitation API responses use `Cache-Control: no-store`; API security headers include `nosniff`, `DENY` framing, a restrictive referrer policy, and a Permissions Policy.
-- Account-action pages set a no-referrer policy and remove the one-time token from the visible URL/history after reading it.
+- Account-action links place one-time tokens in URL fragments (not sent in HTTP requests), set a no-referrer policy, and remove the token from visible URL/history after reading it.
 - Legacy ownership tools remain admin-only CLI utilities; preview is the default and `--apply` is required for a database write.
 
 ## Production configuration
@@ -23,14 +23,14 @@ Required environment variables:
 
 - `EDITFLOW_ENV=production`
 - `EDITFLOW_AUTH_SECRET`: random secret with at least 32 bytes of entropy (prefer 48+ random bytes).
-- `DATABASE_URL`: managed PostgreSQL endpoint, not localhost; require TLS at the database provider/driver.
+- `DATABASE_URL`: managed PostgreSQL endpoint, not localhost, with `?ssl=require` (or an approved `sslmode=require/verify-full`) configured.
 - `EDITFLOW_EMAIL_SMTP_HOST`, `EDITFLOW_EMAIL_SMTP_PORT`, `EDITFLOW_EMAIL_SMTP_USERNAME`, `EDITFLOW_EMAIL_SMTP_PASSWORD`, `EDITFLOW_EMAIL_FROM`.
 - Select exactly one SMTP transport: `EDITFLOW_EMAIL_STARTTLS=true` with `EDITFLOW_EMAIL_USE_SSL=false`, or implicit TLS with the inverse values.
 - `EDITFLOW_EMAIL_PUBLIC_URL=https://<frontend-host>`.
 - `EDITFLOW_CORS_ORIGINS=https://<frontend-host>` (comma-separated explicit HTTPS origins only).
 - `EDITFLOW_STORAGE_BACKEND=s3`, `S3_BUCKET`, and the cloud identity/credentials required by the selected S3 provider.
 
-The production validator rejects localhost database URLs, development CORS origins, HTTP email links, plaintext SMTP, missing SMTP credentials, and local-file storage.
+The production validator rejects localhost database URLs, missing explicit database TLS, development CORS origins, HTTP email links, plaintext SMTP, missing SMTP credentials, and local-file storage.
 
 ## Blockers that still require production access or product decisions
 
