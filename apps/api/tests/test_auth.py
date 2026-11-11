@@ -3,6 +3,16 @@ from uuid import uuid4
 
 from app.auth import create_access_token, decode_access_token, hash_password, verify_password
 
+
+def _response_payload(response):
+    import json
+    from starlette.responses import JSONResponse
+
+    if isinstance(response, JSONResponse):
+        return json.loads(response.body)
+    return response
+
+
 async def _register_verified_account(db_session, monkeypatch, email, password):
     from urllib.parse import urlparse, parse_qs
     import app.main as main
@@ -15,7 +25,7 @@ async def _register_verified_account(db_session, monkeypatch, email, password):
     link = next(line for line in messages[-1].splitlines() if "token=" in line)
     token = parse_qs(urlparse(link).fragment)["token"][0]
     await main.verify_email(ActionTokenRequest(token=token), db_session)
-    return await main.login_account(AuthLoginRequest(email=email, password=password), db_session)
+    return _response_payload(await main.login_account(AuthLoginRequest(email=email, password=password), db_session))
 
 
 
@@ -155,10 +165,10 @@ async def test_register_and_login_issue_tokens_for_normalized_email(db_session, 
     assert registered["expires_in"] == 900
     assert decode_access_token(registered["access_token"]) == __import__("uuid").UUID(registered["user"]["id"])
 
-    logged_in = await login_account(
+    logged_in = _response_payload(await login_account(
         AuthLoginRequest(email="EDITOR@example.com", password="correct horse battery staple"),
         db_session,
-    )
+    ))
     assert logged_in["user"]["id"] == registered["user"]["id"]
     assert logged_in["refresh_token"] != registered["refresh_token"]
     assert decode_access_token(logged_in["access_token"]) == __import__("uuid").UUID(registered["user"]["id"])
@@ -312,10 +322,10 @@ async def test_refresh_token_rotation_and_reuse_revokes_session_family(db_sessio
     registered = await _register_verified_account(
         db_session, monkeypatch, "rotate@example.com", "rotation password long"
     )
-    rotated = await refresh_account(
+    rotated = _response_payload(await refresh_account(
         RefreshTokenRequest(refresh_token=registered["refresh_token"]),
         db_session,
-    )
+    ))
     assert rotated["refresh_token"] != registered["refresh_token"]
     assert decode_access_token(rotated["access_token"]) == __import__("uuid").UUID(rotated["user"]["id"])
 
@@ -345,10 +355,10 @@ async def test_logout_revokes_refresh_session_family(db_session, monkeypatch):
     registered = await _register_verified_account(
         db_session, monkeypatch, "logout@example.com", "logout password long"
     )
-    result = await logout_account(
+    result = _response_payload(await logout_account(
         RefreshTokenRequest(refresh_token=registered["refresh_token"]),
         db_session,
-    )
+    ))
     assert result == {"revoked": True}
     with pytest.raises(HTTPException) as revoked:
         await refresh_account(
@@ -459,9 +469,9 @@ async def test_password_reset_revokes_sessions_and_token_cannot_be_reused(db_ses
             email="reset-user@example.com", password="old secure password"
         ), db_session)
     assert old_password.value.status_code == 401
-    new_session = await main.login_account(AuthLoginRequest(
+    new_session = _response_payload(await main.login_account(AuthLoginRequest(
         email="reset-user@example.com", password="new secure password"
-    ), db_session)
+    ), db_session))
     assert new_session["user"]["email"] == "reset-user@example.com"
 
 
