@@ -92,7 +92,7 @@ def test_render_media_route_supports_http_range_requests(tmp_path, monkeypatch):
 
     monkeypatch.setattr(main, "create_object_storage", lambda settings: storage)
     main.app.dependency_overrides[main.get_db] = override_db
-    main.app.dependency_overrides[main.require_owned_project] = lambda: SimpleNamespace(id=project_id)
+    main.app.dependency_overrides[main.require_project_access] = lambda: SimpleNamespace(id=project_id)
     try:
         with TestClient(main.app) as client:
             response = client.get(
@@ -104,4 +104,4 @@ def test_render_media_route_supports_http_range_requests(tmp_path, monkeypatch):
         assert response.content == b"4567"
     finally:
         main.app.dependency_overrides.pop(main.get_db, None)
-        main.app.dependency_overrides.pop(main.require_owned_project, None)
+        main.app.dependency_overrides.pop(main.require_project_access, None)
