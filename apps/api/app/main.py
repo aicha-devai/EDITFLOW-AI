@@ -1,5 +1,7 @@
 from uuid import UUID, uuid4
 from datetime import datetime, timedelta, timezone
+import hashlib
+import secrets
 from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
@@ -9,7 +11,7 @@ from app.db import get_db
 from app.rendering import create_render_job, get_render_job, request_render_cancellation, RenderJobNotFound
 from sqlalchemy import select, or_, delete, update
 from sqlalchemy.exc import IntegrityError
-from app.models import Project, RenderJob, User, ProjectMember, UserSession, ProjectAuditEvent
+from app.models import Project, RenderJob, User, ProjectMember, UserSession, ProjectAuditEvent, AuthActionToken, ProjectInvitation
 from app.schemas import (
     ProjectCreate, SaveTimelineRequest, RestoreRequest, CreateRenderRequest,
     QCCriticApprovalRequest, AuthRegisterRequest, AuthLoginRequest, ProjectMemberUpsert, RefreshTokenRequest,
@@ -25,6 +27,7 @@ from app.versioning import (
 from app.storage import create_object_storage, LocalObjectStorage, S3ObjectStorage, StorageError
 from app.auth import get_current_user, hash_password, verify_password, create_access_token, generate_refresh_token, hash_refresh_token
 from app.rate_limit import enforce_rate_limit
+from app.emailer import send_email
 
 app = FastAPI(title=settings.api_title, version="0.1.0")
 _allowed_origins = [origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()]
@@ -103,7 +106,22 @@ def _new_refresh_session(user_id: UUID, family_id: UUID | None = None):
     return raw_token, session
 
 
-@app.post("/v1/auth/register", status_code=201)
+def _new_action_token(user_id: UUID, purpose: str, lifetime: timedelta):
+    raw = secrets.token_urlsafe(40)
+    row = AuthActionToken(
+        user_id=user_id,
+        purpose=purpose,
+        token_hash=hashlib.sha256(raw.encode("utf-8")).hexdigest(),
+        expires_at=datetime.now(timezone.utc) + lifetime,
+    )
+    return raw, row
+
+
+def _email_link(path: str, token: str) -> str:
+    return f"{settings.email_public_url.rstrip('/')}{path}?token={token}"
+
+
+@app.post("/v1/auth/register", status_code=202)
 async def register_account(payload: AuthRegisterRequest, db: AsyncSession = Depends(get_db), request: Request = None):
     if not settings.auth_secret or len(settings.auth_secret.encode("utf-8")) < 32:
         raise HTTPException(503, "Authentication is not configured")
@@ -112,27 +130,113 @@ async def register_account(payload: AuthRegisterRequest, db: AsyncSession = Depe
     existing = await db.scalar(select(User).where(User.email == payload.email))
     if existing is not None:
         raise HTTPException(409, "An account with this email already exists")
-    user = User(email=payload.email, password_hash=hash_password(payload.password))
-    db.add(user)
+    user = User(email=payload.email, password_hash=hash_password(payload.password), is_email_verified=False)
+    raw_token, token_row = _new_action_token(user.id, "email_verification", timedelta(hours=24))
+    db.add_all([user, token_row])
     try:
-        await db.flush()
-        access_token = create_access_token(user.id)
-        refresh_token, session = _new_refresh_session(user.id)
-        db.add(session)
         await db.commit()
     except IntegrityError:
         await db.rollback()
         raise HTTPException(409, "An account with this email already exists")
-    except Exception:
-        await db.rollback()
-        raise
-    return {
-        "user": {"id": str(user.id), "email": user.email},
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "token_type": "bearer",
-        "expires_in": settings.auth_access_token_seconds,
-    }
+    await send_email(
+        user.email,
+        "Verify your EDITFLOW AI email",
+        "Verify your email address using this link (valid for 24 hours):\n"
+        + _email_link("/verify-email", raw_token)
+        + "\nIf you did not create this account, you can ignore this message.",
+    )
+    return {"message": "Verification email sent. Verify your email before signing in."}
+
+
+@app.post("/v1/auth/verify-email")
+async def verify_email(payload: ActionTokenRequest, db: AsyncSession = Depends(get_db)):
+    token_hash = hashlib.sha256(payload.token.encode("utf-8")).hexdigest()
+    row = await db.scalar(select(AuthActionToken).where(
+        AuthActionToken.token_hash == token_hash,
+        AuthActionToken.purpose == "email_verification",
+    ).with_for_update())
+    now = datetime.now(timezone.utc)
+    if row is None or row.consumed_at is not None or row.expires_at <= now:
+        raise HTTPException(400, "Verification link is invalid or expired")
+    user = await db.scalar(select(User).where(User.id == row.user_id, User.is_active.is_(True)))
+    if user is None:
+        raise HTTPException(400, "Verification link is invalid or expired")
+    user.is_email_verified = True
+    row.consumed_at = now
+    await db.execute(update(AuthActionToken).where(
+        AuthActionToken.user_id == user.id,
+        AuthActionToken.purpose == "email_verification",
+        AuthActionToken.consumed_at.is_(None),
+    ).values(consumed_at=now))
+    await db.commit()
+    return {"verified": True}
+
+
+@app.post("/v1/auth/resend-verification")
+async def resend_verification(payload: EmailOnlyRequest, db: AsyncSession = Depends(get_db), request: Request = None):
+    client_ip = request.client.host if request and request.client else "unknown"
+    await enforce_rate_limit(db, [f"verify-resend:ip:{client_ip}", f"verify-resend:email:{payload.email}"], 5, 3600)
+    user = await db.scalar(select(User).where(User.email == payload.email, User.is_active.is_(True)))
+    if user is not None and not user.is_email_verified:
+        await db.execute(update(AuthActionToken).where(
+            AuthActionToken.user_id == user.id,
+            AuthActionToken.purpose == "email_verification",
+            AuthActionToken.consumed_at.is_(None),
+        ).values(consumed_at=datetime.now(timezone.utc)))
+        raw, row = _new_action_token(user.id, "email_verification", timedelta(hours=24))
+        db.add(row)
+        await db.commit()
+        await send_email(user.email, "Verify your EDITFLOW AI email",
+            "Use this link within 24 hours:\n" + _email_link("/verify-email", raw))
+    return {"message": "If the account needs verification, an email will be sent."}
+
+
+@app.post("/v1/auth/request-password-reset")
+async def request_password_reset(payload: EmailOnlyRequest, db: AsyncSession = Depends(get_db), request: Request = None):
+    client_ip = request.client.host if request and request.client else "unknown"
+    await enforce_rate_limit(db, [f"password-reset:ip:{client_ip}", f"password-reset:email:{payload.email}"], 5, 3600)
+    user = await db.scalar(select(User).where(User.email == payload.email, User.is_active.is_(True)))
+    if user is not None and user.is_email_verified:
+        await db.execute(update(AuthActionToken).where(
+            AuthActionToken.user_id == user.id,
+            AuthActionToken.purpose == "password_reset",
+            AuthActionToken.consumed_at.is_(None),
+        ).values(consumed_at=datetime.now(timezone.utc)))
+        raw, row = _new_action_token(user.id, "password_reset", timedelta(minutes=30))
+        db.add(row)
+        await db.commit()
+        await send_email(user.email, "Reset your EDITFLOW AI password",
+            "Use this link within 30 minutes:\n" + _email_link("/reset-password", raw)
+            + "\nIf you did not request a reset, ignore this message.")
+    return {"message": "If the account exists and is verified, a reset email will be sent."}
+
+
+@app.post("/v1/auth/reset-password")
+async def reset_password(payload: PasswordResetRequest, db: AsyncSession = Depends(get_db)):
+    token_hash = hashlib.sha256(payload.token.encode("utf-8")).hexdigest()
+    row = await db.scalar(select(AuthActionToken).where(
+        AuthActionToken.token_hash == token_hash,
+        AuthActionToken.purpose == "password_reset",
+    ).with_for_update())
+    now = datetime.now(timezone.utc)
+    if row is None or row.consumed_at is not None or row.expires_at <= now:
+        raise HTTPException(400, "Password reset link is invalid or expired")
+    user = await db.scalar(select(User).where(User.id == row.user_id, User.is_active.is_(True)))
+    if user is None:
+        raise HTTPException(400, "Password reset link is invalid or expired")
+    user.password_hash = hash_password(payload.new_password)
+    row.consumed_at = now
+    await db.execute(update(UserSession).where(
+        UserSession.user_id == user.id,
+        UserSession.revoked_at.is_(None),
+    ).values(revoked_at=now))
+    await db.execute(update(AuthActionToken).where(
+        AuthActionToken.user_id == user.id,
+        AuthActionToken.purpose == "password_reset",
+        AuthActionToken.consumed_at.is_(None),
+    ).values(consumed_at=now))
+    await db.commit()
+    return {"password_reset": True, "sessions_revoked": True}
 
 
 @app.post("/v1/auth/login")
@@ -147,6 +251,8 @@ async def login_account(payload: AuthLoginRequest, db: AsyncSession = Depends(ge
     user = await db.scalar(select(User).where(User.email == payload.email))
     if user is None or not user.is_active or not verify_password(payload.password, user.password_hash):
         raise HTTPException(401, "Invalid email or password", headers={"WWW-Authenticate": "Bearer"})
+    if not user.is_email_verified:
+        raise HTTPException(403, "Verify your email before signing in")
     access_token = create_access_token(user.id)
     refresh_token, session = _new_refresh_session(user.id)
     db.add(session)
@@ -219,7 +325,7 @@ async def logout_account(payload: RefreshTokenRequest, db: AsyncSession = Depend
 
 @app.get("/v1/auth/me")
 async def get_authenticated_account(current_user: User = Depends(get_current_user)):
-    return {"id": str(current_user.id), "email": current_user.email, "is_active": current_user.is_active}
+    return {"id": str(current_user.id), "email": current_user.email, "is_active": current_user.is_active, "is_email_verified": current_user.is_email_verified}
 
 @app.post("/v1/projects", status_code=201)
 async def create_project(payload: ProjectCreate, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
@@ -277,6 +383,89 @@ async def list_project_audit_events(
         "new_role": event.new_role,
         "created_at": event.created_at,
     } for event in events]
+
+
+@app.post("/v1/projects/{project_id}/invitations", status_code=202)
+async def create_project_invitation(
+    project_id: UUID,
+    payload: ProjectInvitationCreate,
+    db: AsyncSession = Depends(get_db),
+    _owned_project: Project = Depends(require_owned_project),
+):
+    if payload.email == (await db.scalar(select(User.email).where(User.id == _owned_project.owner_id))):
+        raise HTTPException(409, "The project owner already has full access")
+    raw = secrets.token_urlsafe(40)
+    invitation = ProjectInvitation(
+        project_id=project_id,
+        inviter_user_id=_owned_project.owner_id,
+        invited_email=payload.email,
+        role=payload.role,
+        token_hash=hashlib.sha256(raw.encode("utf-8")).hexdigest(),
+        expires_at=datetime.now(timezone.utc) + timedelta(days=7),
+    )
+    db.add(invitation)
+    await db.commit()
+    await send_email(
+        payload.email,
+        "You are invited to collaborate in EDITFLOW AI",
+        f"You were invited as {payload.role}. Sign in or create an account with this email, verify it, then accept the invitation using this link (valid for 7 days):\n"
+        + _email_link("/accept-invitation", raw),
+    )
+    return {"message": "Invitation sent", "expires_in_seconds": 604800}
+
+
+@app.post("/v1/invitations/accept")
+async def accept_project_invitation(
+    payload: ActionTokenRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if not current_user.is_email_verified:
+        raise HTTPException(403, "Verify your email before accepting invitations")
+    digest = hashlib.sha256(payload.token.encode("utf-8")).hexdigest()
+    invitation = await db.scalar(select(ProjectInvitation).where(
+        ProjectInvitation.token_hash == digest,
+    ).with_for_update())
+    now = datetime.now(timezone.utc)
+    if (invitation is None or invitation.accepted_at is not None
+        or invitation.revoked_at is not None or invitation.expires_at <= now):
+        raise HTTPException(400, "Invitation is invalid or expired")
+    if invitation.invited_email != current_user.email:
+        raise HTTPException(403, "This invitation belongs to a different email address")
+    project = await db.scalar(select(Project).where(Project.id == invitation.project_id))
+    if project is None:
+        raise HTTPException(404, "Project not found")
+    if project.owner_id == current_user.id:
+        raise HTTPException(409, "Project owner already has full access")
+    member = await db.scalar(select(ProjectMember).where(
+        ProjectMember.project_id == project.id,
+        ProjectMember.user_id == current_user.id,
+    ))
+    previous_role = member.role if member is not None else None
+    if member is None:
+        member = ProjectMember(project_id=project.id, user_id=current_user.id, role=invitation.role)
+        db.add(member)
+        action = "member.added"
+    elif member.role != invitation.role:
+        member.role = invitation.role
+        action = "member.role_changed"
+    else:
+        action = None
+    if action:
+        owner = await db.scalar(select(User).where(User.id == project.owner_id))
+        db.add(ProjectAuditEvent(
+            project_id=project.id,
+            actor_user_id=project.owner_id,
+            actor_email=owner.email if owner else "unknown",
+            target_user_id=current_user.id,
+            target_email=current_user.email,
+            action=action,
+            previous_role=previous_role,
+            new_role=invitation.role,
+        ))
+    invitation.accepted_at = now
+    await db.commit()
+    return {"accepted": True, "project_id": str(project.id), "role": invitation.role}
 
 
 @app.post("/v1/projects/{project_id}/members", status_code=200)
