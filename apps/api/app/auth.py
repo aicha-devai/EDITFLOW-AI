@@ -1,4 +1,5 @@
 import base64
+import binascii
 import hashlib
 import hmac
 import json
@@ -82,7 +83,7 @@ def decode_access_token(token: str) -> UUID:
         return UUID(payload["sub"])
     except HTTPException:
         raise
-    except (ValueError, TypeError, KeyError, json.JSONDecodeError, UnicodeDecodeError):
+    except (ValueError, TypeError, KeyError, json.JSONDecodeError, UnicodeDecodeError, binascii.Error):
         raise HTTPException(401, "Invalid or expired access token", headers={"WWW-Authenticate": "Bearer"})
 
 
