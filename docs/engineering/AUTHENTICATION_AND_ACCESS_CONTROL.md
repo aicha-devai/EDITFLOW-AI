@@ -68,3 +68,19 @@ The current implementation uses the ASGI connection's client address. If the API
 ## Project membership audit log
 
 Migration `0009_project_audit_log` adds an append-only event record for membership additions, role changes, and removals. Each event captures the acting owner, target account, action, previous/new role, and timestamp. Email snapshots remain available if an account is later deleted. The owner can inspect the log at `GET /v1/projects/{project_id}/audit-log`; other project members cannot read administrative audit history. Re-submitting an unchanged role does not create a redundant event.
+
+
+## Email verification, password reset and project invitations
+
+Configure these secrets/environment values in the API deployment:
+- `EDITFLOW_EMAIL_SMTP_HOST`, `EDITFLOW_EMAIL_SMTP_PORT` (default 587)
+- `EDITFLOW_EMAIL_SMTP_USERNAME`, `EDITFLOW_EMAIL_SMTP_PASSWORD`
+- `EDITFLOW_EMAIL_FROM`
+- `EDITFLOW_EMAIL_USE_SSL` (default false), `EDITFLOW_EMAIL_STARTTLS` (default true)
+- `EDITFLOW_EMAIL_PUBLIC_URL` (frontend origin used to construct links)
+
+New registrations are unverified and cannot log in until `POST /v1/auth/verify-email` consumes their 24-hour token. Resend is available through `POST /v1/auth/resend-verification`. Password reset uses `POST /v1/auth/request-password-reset` and `POST /v1/auth/reset-password`; reset tokens expire after 30 minutes, are single-use, and revoke every active refresh session for the account. Responses do not reveal whether an email exists.
+
+Owners can invite any email with `POST /v1/projects/{project_id}/invitations`. Invitations expire after seven days. The invited person must sign in with a verified account whose email exactly matches the invitation, then call `POST /v1/invitations/accept`. Acceptance grants the role and is written to the project audit log. Tokens are stored only as SHA-256 hashes.
+
+Migration `0010_email_and_invitations` preserves pre-existing accounts as verified to avoid locking out existing users; new registrations explicitly start unverified. SMTP delivery must be configured and verified in the deployment environment. The backend test suite mocks the mail transport and does not prove that a real provider accepts or delivers messages.
