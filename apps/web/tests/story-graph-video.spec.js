@@ -227,7 +227,7 @@ test("invitation acceptance stores the authenticated session and returns to the 
   await page.locator("#login-password").fill("example-test-only-value");
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.getByText("Invitation accepted. Opening EDITFLOW AI…")).toBeVisible();
-  await expect.poll(() => page.evaluate(() => location.pathname)).toBe("/");
+  await page.waitForURL(url => url.pathname === "/", { timeout: 10000 });
   await expect.poll(() => page.evaluate(() => sessionStorage.getItem("editflow-access-token"))).toBe("accepted-access-token");
   await expect.poll(() => page.evaluate(() => sessionStorage.getItem("editflow-user-email"))).toBe("invited@example.com");
 });
