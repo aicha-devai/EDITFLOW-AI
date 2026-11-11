@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
+  <meta name="referrer" content="no-referrer">
   <title>EDITFLOW AI · Account security</title>
   <style>
     :root{color-scheme:dark;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0b1020;color:#eef2ff}
@@ -48,6 +49,8 @@
   const params = new URLSearchParams(location.search);
   const action = params.get("action");
   const token = params.get("token") || "";
+  // Keep one-time credentials out of the visible URL and subsequent browser history.
+  if (token) history.replaceState(null, "", location.pathname + "?action=" + encodeURIComponent(action || ""));
   const api = (localStorage.getItem("editflow-api-base") || "http://localhost:8000").replace(/\/$/, "");
   const $ = id => document.getElementById(id);
   const form = $("action-form"), status = $("status");
