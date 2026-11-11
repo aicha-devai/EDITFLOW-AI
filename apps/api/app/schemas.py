@@ -117,7 +117,7 @@ class EmailOnlyRequest(BaseModel):
     @model_validator(mode="after")
     def normalize_and_validate_email(self):
         self.email = self.email.strip().lower()
-        if not re.fullmatch(r"[^\\s@]+@[^\\s@]+\\.[^\\s@]+", self.email):
+        if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", self.email):
             raise ValueError("A valid email address is required")
         return self
 
@@ -138,6 +138,6 @@ class ProjectInvitationCreate(BaseModel):
     @model_validator(mode="after")
     def normalize_and_validate_email(self):
         self.email = self.email.strip().lower()
-        if not re.fullmatch(r"[^\\s@]+@[^\\s@]+\\.[^\\s@]+", self.email):
+        if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", self.email):
             raise ValueError("A valid email address is required")
         return self
