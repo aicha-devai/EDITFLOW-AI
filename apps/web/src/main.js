@@ -3,7 +3,7 @@ import "./styles.css";
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const state = {
-  apiBase: localStorage.getItem("editflow-api-base") || "http://localhost:8000",
+  apiBase: localStorage.getItem("editflow-api-base") || (import.meta.env.DEV ? "http://localhost:8000" : ""),
   accessToken: sessionStorage.getItem("editflow-user-email") ? "cookie" : "",
   refreshToken: "",
   userEmail: sessionStorage.getItem("editflow-user-email") || "",
