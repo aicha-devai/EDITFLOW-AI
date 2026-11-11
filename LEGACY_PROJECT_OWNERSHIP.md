@@ -15,7 +15,13 @@ The utility does not delete assets, timeline versions, render jobs, or project m
 
 ## Commands
 
-Run from `apps/api` with the production database connection configured through the normal secret manager:
+First create a read-only inventory of projects with no owner. Run from `apps/api` in a trusted administrative environment:
+
+```bash
+python scripts/list_legacy_projects.py
+```
+
+Then, with the production database connection configured through the normal secret manager, preview one independently verified claim:
 
 ```bash
 python scripts/claim_legacy_project.py PROJECT_UUID verified-owner@example.com \
