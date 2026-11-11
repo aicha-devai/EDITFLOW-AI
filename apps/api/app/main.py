@@ -1,6 +1,6 @@
 from uuid import UUID, uuid4
 from datetime import datetime, timedelta, timezone
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,6 +24,7 @@ from app.versioning import (
 )
 from app.storage import create_object_storage, LocalObjectStorage, S3ObjectStorage, StorageError
 from app.auth import get_current_user, hash_password, verify_password, create_access_token, generate_refresh_token, hash_refresh_token
+from app.rate_limit import enforce_rate_limit
 
 app = FastAPI(title=settings.api_title, version="0.1.0")
 _allowed_origins = [origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()]
@@ -103,9 +104,11 @@ def _new_refresh_session(user_id: UUID, family_id: UUID | None = None):
 
 
 @app.post("/v1/auth/register", status_code=201)
-async def register_account(payload: AuthRegisterRequest, db: AsyncSession = Depends(get_db)):
+async def register_account(payload: AuthRegisterRequest, db: AsyncSession = Depends(get_db), request: Request | None = None):
     if not settings.auth_secret or len(settings.auth_secret.encode("utf-8")) < 32:
         raise HTTPException(503, "Authentication is not configured")
+    client_ip = request.client.host if request and request.client else "unknown"
+    await enforce_rate_limit(db, [f"register:ip:{client_ip}"], settings.auth_register_limit, settings.auth_register_window_seconds)
     existing = await db.scalar(select(User).where(User.email == payload.email))
     if existing is not None:
         raise HTTPException(409, "An account with this email already exists")
@@ -133,7 +136,14 @@ async def register_account(payload: AuthRegisterRequest, db: AsyncSession = Depe
 
 
 @app.post("/v1/auth/login")
-async def login_account(payload: AuthLoginRequest, db: AsyncSession = Depends(get_db)):
+async def login_account(payload: AuthLoginRequest, db: AsyncSession = Depends(get_db), request: Request | None = None):
+    client_ip = request.client.host if request and request.client else "unknown"
+    await enforce_rate_limit(
+        db,
+        [f"login:ip:{client_ip}", f"login:identity:{client_ip}:{payload.email}"],
+        settings.auth_login_limit,
+        settings.auth_login_window_seconds,
+    )
     user = await db.scalar(select(User).where(User.email == payload.email))
     if user is None or not user.is_active or not verify_password(payload.password, user.password_hash):
         raise HTTPException(401, "Invalid email or password", headers={"WWW-Authenticate": "Bearer"})
