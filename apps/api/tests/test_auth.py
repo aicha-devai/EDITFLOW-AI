@@ -19,7 +19,7 @@ def test_access_token_round_trip_and_tamper_detection(monkeypatch):
     token = create_access_token(user_id)
     assert decode_access_token(token) == user_id
     header, payload, signature = token.split(".")
-    tampered = f"{header}.{payload[:-1]}{'A' if payload[-1] != 'A' else 'B'}.{signature}"
+    tampered = f"{header}.{payload}.{chr(ord(signature[0]) ^ 1)}{signature[1:]}"
     from fastapi import HTTPException
     with pytest.raises(HTTPException) as error:
         decode_access_token(tampered)
