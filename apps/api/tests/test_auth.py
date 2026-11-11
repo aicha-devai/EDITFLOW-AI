@@ -3,6 +3,22 @@ from uuid import uuid4
 
 from app.auth import create_access_token, decode_access_token, hash_password, verify_password
 
+async def _register_verified_account(db_session, monkeypatch, email, password):
+    from urllib.parse import urlparse, parse_qs
+    import app.main as main
+    from app.schemas import AuthRegisterRequest, ActionTokenRequest, AuthLoginRequest
+    messages = []
+    async def fake_send_email(recipient, subject, body):
+        messages.append(body)
+    monkeypatch.setattr(main, "send_email", fake_send_email)
+    await main.register_account(AuthRegisterRequest(email=email, password=password), db_session)
+    link = next(line for line in messages[-1].splitlines() if "token=" in line)
+    token = parse_qs(urlparse(link).query)["token"][0]
+    await main.verify_email(ActionTokenRequest(token=token), db_session)
+    return await main.login_account(AuthLoginRequest(email=email, password=password), db_session)
+
+
+
 
 def test_password_hash_uses_salted_pbkdf2_and_verifies():
     encoded = hash_password("correct horse battery staple")
@@ -38,14 +54,13 @@ def test_auth_secret_must_be_configured(monkeypatch):
 @pytest.mark.asyncio
 async def test_register_and_login_issue_tokens_for_normalized_email(db_session, monkeypatch):
     from app.config import settings
-    from app.main import register_account, login_account
-    from app.schemas import AuthRegisterRequest, AuthLoginRequest
+    from app.main import login_account
+    from app.schemas import AuthLoginRequest
 
     monkeypatch.setattr(settings, "auth_secret", "test-secret-that-is-long-enough-for-hmac-256")
     monkeypatch.setattr(settings, "auth_access_token_seconds", 900)
-    registered = await register_account(
-        AuthRegisterRequest(email="  Editor@Example.com ", password="correct horse battery staple"),
-        db_session,
+    registered = await _register_verified_account(
+        db_session, monkeypatch, "  Editor@Example.com ", "correct horse battery staple"
     )
     assert registered["user"]["email"] == "editor@example.com"
     assert len(registered["refresh_token"]) >= 32
@@ -202,14 +217,13 @@ async def test_owner_can_assign_update_and_remove_project_member(db_session):
 @pytest.mark.asyncio
 async def test_refresh_token_rotation_and_reuse_revokes_session_family(db_session, monkeypatch):
     from app.config import settings
-    from app.main import register_account, refresh_account
-    from app.schemas import AuthRegisterRequest, RefreshTokenRequest
+    from app.main import refresh_account
+    from app.schemas import RefreshTokenRequest
     from fastapi import HTTPException
 
     monkeypatch.setattr(settings, "auth_secret", "test-secret-that-is-long-enough-for-hmac-256")
-    registered = await register_account(
-        AuthRegisterRequest(email="rotate@example.com", password="rotation password long"),
-        db_session,
+    registered = await _register_verified_account(
+        db_session, monkeypatch, "rotate@example.com", "rotation password long"
     )
     rotated = await refresh_account(
         RefreshTokenRequest(refresh_token=registered["refresh_token"]),
@@ -236,14 +250,13 @@ async def test_refresh_token_rotation_and_reuse_revokes_session_family(db_sessio
 @pytest.mark.asyncio
 async def test_logout_revokes_refresh_session_family(db_session, monkeypatch):
     from app.config import settings
-    from app.main import register_account, logout_account, refresh_account
-    from app.schemas import AuthRegisterRequest, RefreshTokenRequest
+    from app.main import logout_account, refresh_account
+    from app.schemas import RefreshTokenRequest
     from fastapi import HTTPException
 
     monkeypatch.setattr(settings, "auth_secret", "test-secret-that-is-long-enough-for-hmac-256")
-    registered = await register_account(
-        AuthRegisterRequest(email="logout@example.com", password="logout password long"),
-        db_session,
+    registered = await _register_verified_account(
+        db_session, monkeypatch, "logout@example.com", "logout password long"
     )
     result = await logout_account(
         RefreshTokenRequest(refresh_token=registered["refresh_token"]),
