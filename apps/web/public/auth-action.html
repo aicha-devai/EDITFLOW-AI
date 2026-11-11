@@ -53,7 +53,7 @@
   const form = $("action-form"), status = $("status");
   const show = id => $(id).classList.remove("hidden");
   const hide = id => $(id).classList.add("hidden");
-  function message(text, error=false) { status.textContent=text; status.classList.toggle("error",error); show("status"); }
+  function message(text, error=false) { status.textContent=text; status.classList.toggle("error",error); status.style.display="block"; show("status"); }
   async function post(path, body, accessToken) {
     const headers={"Content-Type":"application/json"};
     if(accessToken) headers.Authorization="Bearer "+accessToken;
