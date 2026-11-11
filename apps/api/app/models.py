@@ -110,3 +110,12 @@ class RenderJob(Base):
     progress_percent: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     cancel_requested: Mapped[bool] = mapped_column(default=False, nullable=False, server_default="false")
     quality_report: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+
+
+class RateLimitBucket(Base):
+    __tablename__ = "rate_limit_buckets"
+    __table_args__ = (UniqueConstraint("scope_key", name="uq_rate_limit_scope_key"),)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    scope_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    window_started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    request_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
