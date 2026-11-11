@@ -141,7 +141,7 @@ def _new_refresh_session(user_id: UUID, family_id: UUID | None = None):
 
 
 def _cookie_auth_requested(request: Request | None) -> bool:
-    return bool(request and request.headers.get("x-editflow-cookie-auth") == "1")
+    return settings.environment.strip().lower() in {"production", "prod"} or bool(request and request.headers.get("x-editflow-cookie-auth") == "1")
 
 
 def _set_auth_cookies(response: Response, access_token: str, refresh_token: str) -> None:
