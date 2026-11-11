@@ -446,18 +446,18 @@ async function loadGraph() {
 function bindExplorer() {
   $("#graph-search")?.addEventListener("input",e=>{state.search=e.target.value;const pos=e.target.selectionStart;render();const input=$("#graph-search");input.focus();input.setSelectionRange(pos,pos);});
   $$("[data-filter]").forEach(btn=>btn.addEventListener("click",()=>{state.filter=btn.dataset.filter;state.selectedId=null;state.selectedEdgeId=null;render();}));
-  $("[data-node]").forEach(el=>{
+  $$("[data-node]").forEach(el=>{
     const select=()=>selectGraphNode(el.dataset.node);
     el.addEventListener("click",select);
     el.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();select();}});
   });
-  $("[data-edge]").forEach(el=>{
+  $$("[data-edge]").forEach(el=>{
     const inspect=()=>inspectEdge(el.dataset.edge);
     el.addEventListener("click",inspect);
     el.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();inspect();}});
   });
   bindInspectorActions();
-  $("[data-evidence-node]").forEach(el=>el.addEventListener("click",()=>{
+  $$("[data-evidence-node]").forEach(el=>el.addEventListener("click",()=>{
     selectGraphNode(el.dataset.evidenceNode, false);
     seekToTimestamp(el.dataset.jumpTime);
   }));
