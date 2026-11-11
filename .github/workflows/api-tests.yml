@@ -61,6 +61,10 @@ jobs:
         run: npm run build
       - name: Run Story Graph Explorer browser tests
         working-directory: apps/web
+        env:
+          EDITFLOW_STAGING_URL: ${{ secrets.EDITFLOW_STAGING_URL }}
+          EDITFLOW_E2E_EMAIL: ${{ secrets.EDITFLOW_E2E_EMAIL }}
+          EDITFLOW_E2E_PASSWORD: ${{ secrets.EDITFLOW_E2E_PASSWORD }}
         run: npm run test:e2e
       - name: Compile API, tests, and operational scripts
         working-directory: apps/api
