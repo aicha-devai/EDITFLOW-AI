@@ -160,11 +160,12 @@ async def register_account(payload: AuthRegisterRequest, db: AsyncSession = Depe
         raise HTTPException(503, "Authentication is not configured")
     client_ip = request.client.host if request and request.client else "unknown"
     await enforce_rate_limit(db, [f"register:ip:{client_ip}"], settings.auth_register_limit, settings.auth_register_window_seconds)
+    password_hash = hash_password(payload.password)
     existing = await db.scalar(select(User).where(User.email == payload.email))
     if existing is not None:
-        # Keep registration responses identical for existing and new addresses.
+        # Keep registration responses and password-hash work comparable for existing/new addresses.
         return {"message": "If the address can be registered, a verification email will be sent."}
-    user = User(email=payload.email, password_hash=hash_password(payload.password), is_email_verified=False)
+    user = User(email=payload.email, password_hash=password_hash, is_email_verified=False)
     db.add(user)
     try:
         await db.flush()
