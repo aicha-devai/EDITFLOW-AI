@@ -23,7 +23,7 @@ const state = {
   loading: false,
   error: "",
   zoom: 1,
-  studioProjects: [], studioProjectsLoaded: false, studioProjectId: "",
+  studioProjects: [], studioProjectsLoaded: false, studioProjectsReady: false, studioProjectId: "",
   studioAsset: null, studioTimelineVersion: null, studioJob: null,
   studioStatus: "", studioBusy: false,
 };
@@ -146,7 +146,7 @@ function render() {
 function renderStudio() {
   const options = state.studioProjects.map(p => `<option value="${escapeHtml(p.id)}" ${p.id===state.studioProjectId?"selected":""}>${escapeHtml(p.title)}</option>`).join("");
   const asset=state.studioAsset;
-  return `<section class="studio-panel" aria-label="Project studio">
+  return `<section class="studio-panel" aria-label="Project studio" data-studio-ready="${state.studioProjectsReady ? "true" : "false"}">
     <div class="studio-heading"><div><span class="eyebrow">PROJECT WORKSPACE</span><h2>Create, upload and render</h2><p>Start a project, add a source video and create a real render job.</p></div><span class="studio-step">01 — 03</span></div>
     ${state.accessToken ? `
       <form id="studio-project-form" class="studio-project-form"><label>NEW PROJECT TITLE<input id="studio-project-title" maxlength="200" placeholder="e.g. My first story" required></label><button class="primary-button" type="submit" ${state.studioBusy?"disabled":""}>Create project <span>＋</span></button></form>
@@ -169,14 +169,14 @@ function bindStudio() {
 async function createStudioProject(e) {
   e.preventDefault();const title=$("#studio-project-title")?.value.trim();if(!title||state.studioBusy)return;
   state.studioBusy=true;state.studioStatus="Creating project…";render();
-  try{const r=await authorizedFetch(state.apiBase.replace(/\/$/,"")+"/v1/projects",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({title})});const b=await r.json().catch(()=>({}));if(!r.ok)throw new Error(b.detail||"Could not create project.");state.studioProjects.unshift(b);state.studioProjectsLoaded=true;state.studioProjectId=b.id;state.studioAsset=null;state.studioTimelineVersion=null;state.studioJob=null;state.studioStatus="Project created. Choose a source video.";}
+  try{const r=await authorizedFetch(state.apiBase.replace(/\/$/,"")+"/v1/projects",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({title})});const b=await r.json().catch(()=>({}));if(!r.ok)throw new Error(b.detail||"Could not create project.");state.studioProjects.unshift(b);state.studioProjectsLoaded=true;state.studioProjectsReady=true;state.studioProjectId=b.id;state.studioAsset=null;state.studioTimelineVersion=null;state.studioJob=null;state.studioStatus="Project created. Choose a source video.";}
   catch(err){state.studioStatus=err.message||"Project creation failed.";}
   finally{state.studioBusy=false;render();}
 }
 async function loadStudioProjects() {
   state.studioProjectsLoaded=true;
-  try{const r=await authorizedFetch(state.apiBase.replace(/\/$/,"")+"/v1/projects");const b=await r.json().catch(()=>[]);if(!r.ok)throw new Error(b.detail||"Could not load projects.");state.studioProjects=Array.isArray(b)?b:[];if(!state.studioProjectId&&state.studioProjects.length)state.studioProjectId=state.studioProjects[0].id;render();if(state.studioProjectId)await loadStudioAssets();}
-  catch(err){state.studioStatus=err.message||"Could not load projects.";render();}
+  try{const r=await authorizedFetch(state.apiBase.replace(/\/$/,"")+"/v1/projects");const b=await r.json().catch(()=>[]);if(!r.ok)throw new Error(b.detail||"Could not load projects.");state.studioProjects=Array.isArray(b)?b:[];state.studioProjectsReady=true;if(!state.studioProjectId&&state.studioProjects.length)state.studioProjectId=state.studioProjects[0].id;render();if(state.studioProjectId)await loadStudioAssets();}
+  catch(err){state.studioProjectsReady=true;state.studioStatus=err.message||"Could not load projects.";render();}
 }
 async function loadStudioAssets() {
   if(!state.studioProjectId)return;
@@ -560,6 +560,7 @@ async function signIn() {
     if(!response.ok) throw new Error(body.detail || "Sign in failed");
     saveSession(body,email);
     state.studioProjectsLoaded=false;
+    state.studioProjectsReady=false;
     render();
     accountMessage("Signed in successfully.");
   } catch(error) { accountMessage(error.message || "Could not sign in.",true); }
