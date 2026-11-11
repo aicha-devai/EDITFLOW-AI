@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>EDITFLOW AI · Account security</title>
+  <style>
+    :root{color-scheme:dark;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0b1020;color:#eef2ff}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:radial-gradient(ellipse at 15% 10%,#25345b 0,transparent 42%),#0b1020}
+    main{width:min(100%,480px);padding:34px;border:1px solid #2b3858;border-radius:22px;background:#111a2e;box-shadow:0 24px 80px #0006}
+    .mark{font-weight:800;letter-spacing:.12em;color:#c8d4ff;font-size:13px}.mark span{color:#a78bfa}
+    h1{font-size:27px;line-height:1.2;margin:25px 0 10px}p{color:#aebbd5;line-height:1.6;margin:0 0 22px}
+    label{display:block;color:#cbd5e1;font-size:13px;font-weight:650;margin:16px 0 7px}
+    input{width:100%;padding:13px 14px;border-radius:10px;border:1px solid #3a496b;background:#0b1325;color:#fff;font:inherit;outline:none}
+    input:focus{border-color:#a78bfa;box-shadow:0 0 0 3px #a78bfa22}
+    button{width:100%;border:0;border-radius:10px;padding:13px 16px;margin-top:16px;background:#a78bfa;color:#17112c;font-weight:750;font:inherit;cursor:pointer}
+    button.secondary{background:#263552;color:#e5eaff;margin-top:10px}
+    button:disabled{opacity:.6;cursor:wait}.status{display:none;margin-top:18px;padding:13px;border-radius:10px;background:#1b2942;color:#dbeafe;line-height:1.5;overflow-wrap:anywhere}
+    .status.error{background:#42202a;color:#ffd9df}.muted{font-size:12px;color:#8493b2;margin-top:20px}
+    .hidden{display:none!important}
+  </style>
+</head>
+<body>
+<main>
+  <div class="mark">EDITFLOW <span>AI</span></div>
+  <h1 id="heading">Account security</h1>
+  <p id="description">Complete the requested account action securely.</p>
+  <form id="action-form" class="hidden">
+    <div id="email-field" class="hidden">
+      <label for="email">Account email</label><input id="email" type="email" autocomplete="email">
+    </div>
+    <div id="password-field" class="hidden">
+      <label for="password">New password</label><input id="password" type="password" minlength="12" maxlength="128" autocomplete="new-password">
+      <label for="confirm-password">Confirm password</label><input id="confirm-password" type="password" minlength="12" maxlength="128" autocomplete="new-password">
+    </div>
+    <div id="login-fields" class="hidden">
+      <label for="login-password">Password</label><input id="login-password" type="password" minlength="12" maxlength="128" autocomplete="current-password">
+    </div>
+    <button id="primary" type="submit">Continue</button>
+    <button id="register" class="secondary hidden" type="button">Create account with this email</button>
+  </form>
+  <div id="status" class="status" role="status" aria-live="polite"></div>
+  <div class="muted">If you did not request this action, you can safely close this page.</div>
+</main>
+<script>
+(() => {
+  const params = new URLSearchParams(location.search);
+  const action = params.get("action");
+  const token = params.get("token") || "";
+  const api = (localStorage.getItem("editflow-api-base") || "http://localhost:8000").replace(/\/$/, "");
+  const $ = id => document.getElementById(id);
+  const form = $("action-form"), status = $("status");
+  const show = id => $(id).classList.remove("hidden");
+  const hide = id => $(id).classList.add("hidden");
+  function message(text, error=false) { status.textContent=text; status.classList.toggle("error",error); show("status"); }
+  async function post(path, body, accessToken) {
+    const headers={"Content-Type":"application/json"};
+    if(accessToken) headers.Authorization="Bearer "+accessToken;
+    const response=await fetch(api+path,{method:"POST",headers,body:JSON.stringify(body)});
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok) throw new Error(data.detail || data.message || "Request failed ("+response.status+")");
+    return data;
+  }
+  if(!token || !["verify-email","reset-password","accept-invitation"].includes(action)) {
+    $("heading").textContent="Invalid or incomplete link";
+    $("description").textContent="This account action link is missing information. Request a new email and try again.";
+    message("The link is invalid.",true);
+    return;
+  }
+  form.classList.remove("hidden");
+  if(action==="verify-email") {
+    $("heading").textContent="Verify your email";
+    $("description").textContent="Confirm that this email address belongs to you.";
+    form.addEventListener("submit",async event=>{
+      event.preventDefault(); $("primary").disabled=true;
+      try { await post("/v1/auth/verify-email",{token}); message("Email verified successfully. You can now sign in to EDITFLOW AI."); hide("action-form"); }
+      catch(error){message(error.message,true);$("primary").disabled=false;}
+    });
+  } else if(action==="reset-password") {
+    $("heading").textContent="Reset your password";
+    $("description").textContent="Choose a new password with at least 12 characters. Your active sessions will be revoked.";
+    show("password-field");
+    form.addEventListener("submit",async event=>{
+      event.preventDefault();
+      const password=$("password").value;
+      if(password!==$("confirm-password").value){message("The passwords do not match.",true);return;}
+      $("primary").disabled=true;
+      try { await post("/v1/auth/reset-password",{token,new_password:password}); message("Password updated. Sign in again with your new password."); hide("action-form"); }
+      catch(error){message(error.message,true);$("primary").disabled=false;}
+    });
+  } else {
+    $("heading").textContent="Accept project invitation";
+    $("description").textContent="Sign in with the invited email address, or create an account first. New accounts must verify their email before accepting.";
+    show("email-field"); show("login-fields"); show("register");
+    $("register").addEventListener("click",async()=>{
+      $("register").disabled=true;
+      try {
+        await post("/v1/auth/register",{email:$("email").value,password:$("login-password").value});
+        message("Verification email sent. Verify your email, then reopen this invitation link to accept it.");
+      } catch(error){message(error.message,true);}
+      finally{$("register").disabled=false;}
+    });
+    form.addEventListener("submit",async event=>{
+      event.preventDefault(); $("primary").disabled=true;
+      try {
+        const session=await post("/v1/auth/login",{email:$("email").value,password:$("login-password").value});
+        const result=await post("/v1/invitations/accept",{token},session.access_token);
+        message("Invitation accepted. You now have "+result.role+" access to the project."); hide("action-form");
+      } catch(error){message(error.message,true);$("primary").disabled=false;}
+    });
+  }
+})();
+</script>
+</body>
+</html>
