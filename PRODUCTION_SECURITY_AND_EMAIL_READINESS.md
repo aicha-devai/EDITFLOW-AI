@@ -100,13 +100,15 @@ Send controlled messages through registration, verification, resend, password re
 
 ### Backup and restore drill
 
-The repository now includes:
+The repository now includes encrypted backup and guarded restore utilities. Install PostgreSQL client tools and the `age` utility on the backup host.
+
+Create an encrypted backup:
 
 ```bash
 cd apps/api
-DATABASE_URL='postgresql+asyncpg://...' \\
-BACKUP_AGE_RECIPIENT='age1...' \\
-  python scripts/backup_postgres.py --output-dir /secure-backup-staging
+export DATABASE_URL='postgresql+asyncpg://...'
+export BACKUP_AGE_RECIPIENT='age1...'
+python scripts/backup_postgres.py --output-dir /secure-backup-staging
 ```
 
 The backup command creates a PostgreSQL custom-format archive, validates it with `pg_restore --list`, encrypts it with the age recipient public key, and writes a SHA-256 metadata file for the encrypted archive. Keep the age identity private key outside the backup host and store both archive and metadata in access-controlled off-host storage with immutable retention and alerting. Schedule this command (or the managed database provider's equivalent) at the required RPO; this script is a backup primitive, not a scheduler or off-site storage service.
@@ -114,11 +116,13 @@ The backup command creates a PostgreSQL custom-format archive, validates it with
 For a restore drill, provision a separate empty database whose name contains `restore` or `drill`, then run:
 
 ```bash
-RESTORE_DATABASE_URL='postgresql+asyncpg://.../editflow_restore?ssl=require' \\\
-  python scripts/restore_postgres.py /secure-backup-staging/editflow-TIMESTAMP.dump --allow-overwrite
+cd apps/api
+export RESTORE_DATABASE_URL='postgresql+asyncpg://.../editflow_restore?ssl=require'
+export AGE_IDENTITY_FILE='/secure/keys/editflow-backup-identity.txt'
+python scripts/restore_postgres.py /secure-backup-staging/editflow-TIMESTAMP.dump.age --allow-overwrite
 ```
 
-The restore script checks the archive checksum and metadata, validates the archive listing, and refuses target database names that do not contain `restore` or `drill`. It is still destructive to that target database. After restore, run Alembic status, application smoke tests, project/asset counts, and representative render/media reads. Record duration and achieved RPO/RTO. Never restore over production as part of a drill.
+The restore script checks the encrypted archive checksum and metadata, decrypts to a mode-0600 temporary file, validates the archive listing, and refuses target database names that do not contain `restore` or `drill`. It is still destructive to that target database. After restore, run Alembic status, application smoke tests, project/asset counts, and representative render/media reads. Record duration and achieved RPO/RTO. Never restore over production as part of a drill.
 
 ### Legacy project ownership migration
 
