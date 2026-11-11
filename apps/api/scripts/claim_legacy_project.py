@@ -46,11 +46,12 @@ async def claim_legacy_project(db: AsyncSession, project_id: UUID, owner_email: 
         new_role="owner",
         details=reason.strip(),
     ))
+    result = {"applied": bool(apply), "dry_run": not apply, "project_id": str(project.id), "owner_email": owner.email}
     if apply:
         await db.commit()
-        return {"applied": True, "project_id": str(project.id), "owner_email": owner.email}
+        return result
     await db.rollback()
-    return {"applied": False, "dry_run": True, "project_id": str(project.id), "owner_email": owner.email}
+    return result
 
 
 async def run_claim(project_id: UUID, owner_email: str, operator: str, reason: str, apply: bool = False):
