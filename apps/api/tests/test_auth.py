@@ -186,6 +186,18 @@ async def test_owner_can_assign_update_and_remove_project_member(db_session):
     members = await list_project_members(project.id, db_session, _owned_project=project)
     assert [item["role"] for item in members] == ["owner"]
 
+    from app.main import list_project_audit_events
+    events = await list_project_audit_events(project.id, db_session, _owned_project=project)
+    assert {event["action"] for event in events} == {
+        "member.added", "member.role_changed", "member.removed"
+    }
+    assert {
+        (event["previous_role"], event["new_role"])
+        for event in events
+    } == {(None, "viewer"), ("viewer", "editor"), ("editor", None)}
+    assert all(event["actor_email"] == owner.email for event in events)
+    assert all(event["target_email"] == member.email for event in events)
+
 
 @pytest.mark.asyncio
 async def test_refresh_token_rotation_and_reuse_revokes_session_family(db_session, monkeypatch):
