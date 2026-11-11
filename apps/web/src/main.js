@@ -4,8 +4,8 @@ const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const state = {
   apiBase: localStorage.getItem("editflow-api-base") || "http://localhost:8000",
-  accessToken: sessionStorage.getItem("editflow-access-token") || "",
-  refreshToken: sessionStorage.getItem("editflow-refresh-token") || "",
+  accessToken: sessionStorage.getItem("editflow-user-email") ? "cookie" : "",
+  refreshToken: "",
   userEmail: sessionStorage.getItem("editflow-user-email") || "",
   mediaObjectUrl: "",
   projectId: "",
@@ -131,7 +131,7 @@ function render() {
         </div>
         <button id="account-logout" class="icon-button full" ${state.accessToken ? "" : "disabled"}>Sign out</button>
         <p id="account-message" class="muted" role="status"></p>
-        <p class="muted">New accounts must verify their email before signing in. Access and refresh tokens are kept in this browser tab session.</p>
+        <p class="muted">New accounts must verify their email before signing in. Session credentials are held in secure, HttpOnly cookies.</p>
       </section>
     </div>`;
   bindShell();
@@ -452,12 +452,19 @@ function bindShell() {
     $("#settings-modal").classList.add("hidden");
   });
 }
+function csrfToken() {
+  const item=document.cookie.split("; ").find(value=>value.startsWith("editflow_csrf="));
+  return item ? decodeURIComponent(item.slice("editflow_csrf=".length)) : "";
+}
+function cookieHeaders(headers={}) {
+  return {...headers,"X-Editflow-Cookie-Auth":"1",...(csrfToken()?{"X-CSRF-Token":csrfToken()}:{})};
+}
 function saveSession(data, email) {
-  state.accessToken=data.access_token;
-  state.refreshToken=data.refresh_token;
+  state.accessToken="cookie";
+  state.refreshToken="";
   state.userEmail=email || data.user?.email || "";
-  sessionStorage.setItem("editflow-access-token",state.accessToken);
-  sessionStorage.setItem("editflow-refresh-token",state.refreshToken);
+  sessionStorage.removeItem("editflow-access-token");
+  sessionStorage.removeItem("editflow-refresh-token");
   sessionStorage.setItem("editflow-user-email",state.userEmail);
   const status=$("#account-status");
   if(status) status.textContent=state.userEmail;
@@ -486,7 +493,7 @@ async function signIn() {
   const email=$("#account-email").value.trim();
   const password=$("#account-password").value;
   try {
-    const response=await fetch(state.apiBase+"/v1/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,password})});
+    const response=await fetch(state.apiBase+"/v1/auth/login",{method:"POST",credentials:"include",headers:cookieHeaders({"Content-Type":"application/json"}),body:JSON.stringify({email,password})});
     const body=await response.json().catch(()=>({}));
     if(!response.ok) throw new Error(body.detail || "Sign in failed");
     saveSession(body,email);
@@ -497,7 +504,7 @@ async function registerAccount() {
   const email=$("#account-email").value.trim();
   const password=$("#account-password").value;
   try {
-    const response=await fetch(state.apiBase+"/v1/auth/register",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,password})});
+    const response=await fetch(state.apiBase+"/v1/auth/register",{method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,password})});
     const body=await response.json().catch(()=>({}));
     if(!response.ok) throw new Error(body.detail || "Registration failed");
     accountMessage("Verification email sent. Verify your email, then sign in here.");
@@ -507,7 +514,7 @@ async function requestPasswordReset() {
   const email=$("#account-email")?.value.trim();
   if(!email) return accountMessage("Enter your account email first.",true);
   try {
-    const response=await fetch(state.apiBase+"/v1/auth/request-password-reset",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email})});
+    const response=await fetch(state.apiBase+"/v1/auth/request-password-reset",{method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify({email})});
     const body=await response.json().catch(()=>({}));
     if(!response.ok) throw new Error(body.detail || "Could not request password reset.");
     accountMessage(body.message || "If the account exists and is verified, a reset email will be sent.");
@@ -517,7 +524,7 @@ async function resendVerificationEmail() {
   const email=$("#account-email")?.value.trim();
   if(!email) return accountMessage("Enter your account email first.",true);
   try {
-    const response=await fetch(state.apiBase+"/v1/auth/resend-verification",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email})});
+    const response=await fetch(state.apiBase+"/v1/auth/resend-verification",{method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify({email})});
     const body=await response.json().catch(()=>({}));
     if(!response.ok) throw new Error(body.detail || "Could not resend verification email.");
     accountMessage(body.message || "If the account needs verification, a new email will be sent.");
@@ -542,7 +549,7 @@ async function sendProjectInvitation() {
 }
 async function signOut() {
   try {
-    if(state.refreshToken) await fetch(state.apiBase+"/v1/auth/logout",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({refresh_token:state.refreshToken})});
+    if(state.accessToken) await fetch(state.apiBase+"/v1/auth/logout",{method:"POST",credentials:"include",headers:cookieHeaders({"Content-Type":"application/json"}),body:"{}"});
   } finally {
     clearSession();
     if(state.mediaObjectUrl) URL.revokeObjectURL(state.mediaObjectUrl);
@@ -553,13 +560,13 @@ async function signOut() {
 }
 async function authorizedFetch(url, options={}) {
   if(!state.accessToken) throw new Error("Sign in to access this project.");
-  const send=()=>fetch(url,{...options,headers:{...(options.headers||{}),Authorization:"Bearer "+state.accessToken}});
+  const send=()=>fetch(url,{...options,credentials:"include",headers:cookieHeaders(options.headers||{})});
   let response=await send();
-  if(response.status===401 && state.refreshToken) {
-    const refreshed=await fetch(state.apiBase+"/v1/auth/refresh",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({refresh_token:state.refreshToken})});
-    const body=await refreshed.json().catch(()=>({}));
+  if(response.status===401) {
+    const refreshed=await fetch(state.apiBase+"/v1/auth/refresh",{method:"POST",credentials:"include",
+      headers:cookieHeaders({"Content-Type":"application/json"}),body:"{}"});
     if(!refreshed.ok) { clearSession(); throw new Error("Your session expired. Sign in again."); }
-    saveSession(body);
+    state.accessToken="cookie";
     response=await send();
   }
   return response;
