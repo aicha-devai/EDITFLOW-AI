@@ -79,7 +79,7 @@ The explorer supports:
 - Relationship verification labels and explicit narration-claim warnings for causal edges.
 - Graph zoom controls and responsive layout.
 
-For non-local hosting, set `EDITFLOW_CORS_ORIGINS` to a comma-separated allowlist of the exact browser origins hosting the explorer. Do not use a wildcard for a credentialed or public deployment. The current API does not implement workspace authentication; keep it on a trusted development network until authorization is added.
+The Explorer requires an authenticated account. Project reads are limited to the owner and accepted collaborators; project mutations require owner/editor access. Viewer collaborators have read-only access. For non-local hosting, set `EDITFLOW_CORS_ORIGINS` to the exact HTTPS browser origins. The Compose file is for development only; do not expose its default database credentials or ports as a public production deployment.
 
 
 ### Timestamp-linked video playback
@@ -94,3 +94,15 @@ The player does not expose raw storage object keys as public URLs and does not m
 
 
 The Explorer also shows a horizontally scrollable, timestamp-sorted evidence strip (up to 160 markers). Selecting a marker selects its exact graph node and seeks the player. During playback, the current timestamped evidence is highlighted in both the strip and graph, and the player status identifies the active evidence item. This is a time-overlap cue, not a claim that the evidence semantically verifies the video content.
+
+
+## Account security and production readiness
+
+- Account registration requires email verification.
+- Password reset links are one-time and revoke existing sessions.
+- Project invitations are email-bound, expire, and support Editor or Viewer access.
+- Access and refresh sessions rotate; refresh-token reuse revokes the session family.
+- See [Production Security and Email Readiness](PRODUCTION_SECURITY_AND_EMAIL_READINESS.md) for mandatory deployment checks and remaining launch blockers.
+- See [Legacy Project Ownership Recovery](LEGACY_PROJECT_OWNERSHIP.md) for the read-only inventory and audited claim runbook.
+
+**Production status:** not approved for public launch until the production ownership inventory is reconciled, SMTP delivery is verified, browser tokens move to HttpOnly cookies (or an equivalent BFF design), and infrastructure/backup controls are signed off.
