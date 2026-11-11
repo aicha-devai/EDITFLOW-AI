@@ -4,7 +4,7 @@ import hashlib
 import secrets
 from fastapi import FastAPI, Depends, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse, JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings, validate_production_settings
 from app.db import get_db
@@ -318,15 +318,12 @@ async def login_account(payload: AuthLoginRequest, db: AsyncSession = Depends(ge
     await db.commit()
     result = {"user": {"id": str(user.id), "email": user.email}, "token_type": "bearer",
         "expires_in": settings.auth_access_token_seconds}
-    response = Response()
     if _cookie_auth_requested(request):
+        response = JSONResponse(result)
         _set_auth_cookies(response, access_token, refresh_token)
-    else:
-        result.update({"access_token": access_token, "refresh_token": refresh_token})
-    response.media_type = "application/json"
-    import json
-    response.body = json.dumps(result, default=str).encode("utf-8")
-    return response
+        return response
+    result.update({"access_token": access_token, "refresh_token": refresh_token})
+    return JSONResponse(result)
 
 
 @app.post("/v1/auth/refresh")
@@ -360,15 +357,12 @@ async def refresh_account(payload: RefreshTokenRequest | None = None, request: R
     await db.commit()
     result = {"user": {"id": str(user.id), "email": user.email}, "token_type": "bearer",
         "expires_in": settings.auth_access_token_seconds}
-    response = Response()
     if _cookie_auth_requested(request) or (request and request.cookies.get("editflow_refresh")):
+        response = JSONResponse(result)
         _set_auth_cookies(response, access_token, refresh_token)
-    else:
-        result.update({"access_token": access_token, "refresh_token": refresh_token})
-    import json
-    response.media_type = "application/json"
-    response.body = json.dumps(result, default=str).encode("utf-8")
-    return response
+        return response
+    result.update({"access_token": access_token, "refresh_token": refresh_token})
+    return JSONResponse(result)
 
 
 @app.post("/v1/auth/logout")
@@ -382,11 +376,8 @@ async def logout_account(payload: RefreshTokenRequest | None = None, request: Re
             await db.execute(update(UserSession).where(UserSession.family_id == session.family_id,
                 UserSession.revoked_at.is_(None)).values(revoked_at=now))
             await db.commit()
-    response = Response()
+    response = JSONResponse({"revoked": True})
     _clear_auth_cookies(response)
-    import json
-    response.media_type = "application/json"
-    response.body = json.dumps({"revoked": True}).encode("utf-8")
     return response
 
 
