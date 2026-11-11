@@ -52,6 +52,59 @@ def test_auth_secret_must_be_configured(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_cookie_login_issues_httponly_tokens_without_exposing_them(db_session, monkeypatch):
+    import json
+    from starlette.requests import Request
+    from app.config import settings
+    import app.main as main
+    from app.models import User
+    from app.schemas import AuthLoginRequest
+
+    monkeypatch.setattr(settings, "auth_secret", "test-secret-that-is-long-enough-for-hmac-256")
+    user = User(email="cookie-login@example.com", password_hash=hash_password("cookie auth password"),
+        is_email_verified=True)
+    db_session.add(user)
+    await db_session.flush()
+    request = Request({
+        "type": "http", "method": "POST", "path": "/v1/auth/login",
+        "headers": [(b"x-editflow-cookie-auth", b"1")],
+        "query_string": b"", "server": ("testserver", 80), "client": ("127.0.0.1", 1234),
+        "scheme": "http",
+    })
+    response = await main.login_account(
+        AuthLoginRequest(email=user.email, password="cookie auth password"), db_session, request
+    )
+    body = json.loads(response.body)
+    assert body["user"]["email"] == user.email
+    assert "access_token" not in body and "refresh_token" not in body
+    cookies = response.headers.getlist("set-cookie")
+    assert any(cookie.startswith("editflow_access=") and "httponly" in cookie.lower() for cookie in cookies)
+    assert any(cookie.startswith("editflow_refresh=") and "httponly" in cookie.lower() for cookie in cookies)
+    assert any(cookie.startswith("editflow_csrf=") and "httponly" not in cookie.lower() for cookie in cookies)
+
+
+@pytest.mark.asyncio
+async def test_access_cookie_authenticates_without_bearer_header(db_session, monkeypatch):
+    from starlette.requests import Request
+    from app.config import settings
+    from app.auth import get_current_user
+    from app.models import User
+
+    monkeypatch.setattr(settings, "auth_secret", "test-secret-that-is-long-enough-for-hmac-256")
+    user = User(email="cookie-user@example.com", password_hash=hash_password("cookie auth password"))
+    db_session.add(user)
+    await db_session.flush()
+    token = create_access_token(user.id)
+    request = Request({
+        "type": "http", "method": "GET", "path": "/v1/auth/me",
+        "headers": [(b"cookie", f"editflow_access={token}".encode())],
+        "query_string": b"", "server": ("testserver", 80), "client": ("127.0.0.1", 1234),
+        "scheme": "http",
+    })
+    assert await get_current_user(request, None, db_session) is user
+
+
+@pytest.mark.asyncio
 async def test_register_and_login_issue_tokens_for_normalized_email(db_session, monkeypatch):
     from app.config import settings
     from app.main import login_account
