@@ -73,3 +73,55 @@ Only after the preview is checked and approved by a second operator, execute the
 ## CI evidence
 
 The repository's previous CI run passed 7/7 Playwright tests and 122 backend tests (1 skipped, 1 warning). That result is code-level test evidence only; it is not a production deployment, SMTP, backup/restore, or ownership-migration sign-off.
+
+
+## Deployment artifacts added in the repository
+
+- `docker-compose.production.yml` is a standalone production topology: the API and render worker use managed PostgreSQL with TLS and S3-compatible storage; only the Nginx ingress publishes ports 80/443.
+- `deploy/nginx.conf` redirects HTTP to HTTPS, serves the frontend through the web container, and proxies `/v1/*` and `/health` to the API. It forwards the original client address only from this ingress and sets the external scheme to HTTPS.
+- `apps/web/Dockerfile` builds the web app into a small Nginx image.
+- Mount a valid certificate/key pair at `deploy/tls/fullchain.pem` and `deploy/tls/privkey.pem` before starting the stack. The configured certificate must cover the public hostname. Replace the default Nginx `server_name _` with the exact hostname before deployment.
+- Start with `docker compose -f docker-compose.production.yml config`, then `docker compose -f docker-compose.production.yml up -d --build`. Inject all required values through a secret manager; never commit a production `.env`.
+
+### HTTPS and browser session verification (must run against the real hostname)
+
+1. Confirm the DNS A/AAAA records point to the ingress and the certificate hostname, chain, and expiry are valid.
+2. Confirm `curl -I http://YOUR_HOST/` returns a redirect to HTTPS and `curl -fsS https://YOUR_HOST/health` returns a healthy API response.
+3. In a clean browser profile, register/verify a controlled account, log in, reload, and confirm the session persists without access/refresh tokens in localStorage or sessionStorage.
+4. Confirm access and refresh cookies are `HttpOnly; Secure; SameSite=Lax`; the CSRF cookie is readable but its value is required in `X-CSRF-Token` for state-changing cookie-authenticated requests.
+5. Confirm refresh rotation, logout invalidation, invitation acceptance, and a rejected mutation without a matching CSRF token. Repeat from the exact production origin.
+6. Confirm API and database ports are not publicly reachable. Only ingress ports 80/443 should be exposed.
+
+### Real email authentication and domain DNS verification
+
+Use the SMTP provider's exact domain-verification, SPF, DKIM and DMARC instructions. Do not publish guessed SPF or DKIM values. Ensure there is only one SPF TXT policy at the apex, publish every provider-issued DKIM selector, and start DMARC with a monitored policy appropriate to the domain's existing senders. Raise enforcement only after reviewing aggregate reports and confirming alignment.
+
+Send controlled messages through registration, verification, resend, password reset and project invitations. For each, inspect provider delivery logs and recipient inbox/spam placement, confirm SPF and DKIM pass and align with the visible From domain, confirm DMARC pass, and test expiry and one-time use of links. A successful SMTP submission is not proof of inbox placement.
+
+### Backup and restore drill
+
+The repository now includes:
+
+```bash
+cd apps/api
+DATABASE_URL='postgresql+asyncpg://...' python scripts/backup_postgres.py --output-dir /secure-backup-staging
+```
+
+The backup command creates a PostgreSQL custom-format archive, validates it with `pg_restore --list`, and writes a SHA-256 metadata file. Copy both files to encrypted, access-controlled off-host storage with immutable retention and alerting. Schedule this command (or the managed database provider's equivalent) at the required RPO; this script is a backup primitive, not a scheduler or off-site storage service.
+
+For a restore drill, provision a separate empty database whose name contains `restore` or `drill`, then run:
+
+```bash
+RESTORE_DATABASE_URL='postgresql+asyncpg://.../editflow_restore?ssl=require' \\\
+  python scripts/restore_postgres.py /secure-backup-staging/editflow-TIMESTAMP.dump --allow-overwrite
+```
+
+The restore script checks the archive checksum and metadata, validates the archive listing, and refuses target database names that do not contain `restore` or `drill`. It is still destructive to that target database. After restore, run Alembic status, application smoke tests, project/asset counts, and representative render/media reads. Record duration and achieved RPO/RTO. Never restore over production as part of a drill.
+
+### Legacy project ownership migration
+
+The production inventory and claim scripts are present, but no production database was connected in this environment. Run the read-only inventory first. Independently verify each claimant against source-of-truth evidence and obtain documented second-person approval for each individual project. Use dry-run, review output, then `--apply` one project at a time. Verify the owner and `ownership.claimed` audit event after each commit. Do not run a bulk transfer.
+
+## Current execution state
+
+The deployment, proxy, backup and restore tooling is committed, but it has not been exercised against a real hostname, SMTP provider, production database, object store, or production backup target. Those are external verification gates, not code-completion checkboxes. Do not approve public launch until the evidence for every gate above is attached to the release record.
