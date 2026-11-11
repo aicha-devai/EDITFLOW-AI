@@ -2,7 +2,7 @@ from uuid import UUID, uuid4
 from datetime import datetime, timedelta, timezone
 import hashlib
 import secrets
-from fastapi import FastAPI, Depends, HTTPException, Request
+from fastapi import FastAPI, Depends, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -40,6 +40,14 @@ async def validate_runtime_configuration():
 
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
+    unsafe = request.method.upper() not in {"GET", "HEAD", "OPTIONS", "TRACE"}
+    has_session_cookie = bool(request.cookies.get("editflow_access") or request.cookies.get("editflow_refresh"))
+    if unsafe and has_session_cookie:
+        csrf_cookie = request.cookies.get("editflow_csrf", "")
+        csrf_header = request.headers.get("x-csrf-token", "")
+        if not csrf_cookie or not csrf_header or not secrets.compare_digest(csrf_cookie, csrf_header):
+            from starlette.responses import JSONResponse
+            return JSONResponse({"detail": "CSRF validation failed"}, status_code=403, headers={"Cache-Control": "no-store"})
     response = await call_next(request)
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "DENY")
@@ -55,7 +63,7 @@ _allowed_origins = [origin.strip() for origin in settings.cors_origins.split(","
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_allowed_origins,
-    allow_credentials=False,
+    allow_credentials=True,
     allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["Accept", "Content-Type", "Authorization"],
 )
@@ -125,6 +133,26 @@ def _new_refresh_session(user_id: UUID, family_id: UUID | None = None):
         expires_at=datetime.now(timezone.utc) + timedelta(days=settings.auth_refresh_token_days),
     )
     return raw_token, session
+
+
+def _cookie_auth_requested(request: Request | None) -> bool:
+    return bool(request and request.headers.get("x-editflow-cookie-auth") == "1")
+
+
+def _set_auth_cookies(response: Response, access_token: str, refresh_token: str) -> None:
+    secure = settings.environment.strip().lower() in {"production", "prod"}
+    response.set_cookie("editflow_access", access_token, max_age=settings.auth_access_token_seconds,
+        httponly=True, secure=secure, samesite="lax", path="/")
+    response.set_cookie("editflow_refresh", refresh_token, max_age=settings.auth_refresh_token_days * 86400,
+        httponly=True, secure=secure, samesite="lax", path="/")
+    response.set_cookie("editflow_csrf", secrets.token_urlsafe(32), max_age=settings.auth_refresh_token_days * 86400,
+        httponly=False, secure=secure, samesite="lax", path="/")
+
+
+def _clear_auth_cookies(response: Response) -> None:
+    secure = settings.environment.strip().lower() in {"production", "prod"}
+    for name in ("editflow_access", "editflow_refresh", "editflow_csrf"):
+        response.delete_cookie(name, path="/", secure=secure, httponly=name != "editflow_csrf", samesite="lax")
 
 
 def _new_action_token(user_id: UUID, purpose: str, lifetime: timedelta):
@@ -279,45 +307,41 @@ async def reset_password(payload: PasswordResetRequest, db: AsyncSession = Depen
 @app.post("/v1/auth/login")
 async def login_account(payload: AuthLoginRequest, db: AsyncSession = Depends(get_db), request: Request = None):
     client_ip = request.client.host if request and request.client else "unknown"
-    await enforce_rate_limit(
-        db,
-        [f"login:ip:{client_ip}", f"login:identity:{client_ip}:{payload.email}"],
-        settings.auth_login_limit,
-        settings.auth_login_window_seconds,
-    )
+    await enforce_rate_limit(db, [f"login:ip:{client_ip}", f"login:identity:{client_ip}:{payload.email}"],
+        settings.auth_login_limit, settings.auth_login_window_seconds)
     user = await db.scalar(select(User).where(User.email == payload.email))
-    if user is None or not user.is_active or not verify_password(payload.password, user.password_hash):
-        raise HTTPException(401, "Invalid email or password", headers={"WWW-Authenticate": "Bearer"})
-    if not user.is_email_verified:
+    if user is None or not user.is_active or not verify_password(payload.password, user.password_hash) or not user.is_email_verified:
         raise HTTPException(401, "Invalid email or password", headers={"WWW-Authenticate": "Bearer"})
     access_token = create_access_token(user.id)
     refresh_token, session = _new_refresh_session(user.id)
     db.add(session)
     await db.commit()
-    return {
-        "user": {"id": str(user.id), "email": user.email},
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "token_type": "bearer",
-        "expires_in": settings.auth_access_token_seconds,
-    }
+    result = {"user": {"id": str(user.id), "email": user.email}, "token_type": "bearer",
+        "expires_in": settings.auth_access_token_seconds}
+    response = Response()
+    if _cookie_auth_requested(request):
+        _set_auth_cookies(response, access_token, refresh_token)
+    else:
+        result.update({"access_token": access_token, "refresh_token": refresh_token})
+    response.media_type = "application/json"
+    import json
+    response.body = json.dumps(result, default=str).encode("utf-8")
+    return response
 
 
 @app.post("/v1/auth/refresh")
-async def refresh_account(payload: RefreshTokenRequest, db: AsyncSession = Depends(get_db)):
-    token_hash = hash_refresh_token(payload.refresh_token)
-    session = await db.scalar(
-        select(UserSession).where(UserSession.refresh_token_hash == token_hash).with_for_update()
-    )
+async def refresh_account(payload: RefreshTokenRequest | None = None, request: Request = None, db: AsyncSession = Depends(get_db)):
+    raw_refresh = payload.refresh_token if payload else (request.cookies.get("editflow_refresh") if request else None)
+    if not raw_refresh:
+        raise HTTPException(401, "Refresh token is required")
+    token_hash = hash_refresh_token(raw_refresh)
+    session = await db.scalar(select(UserSession).where(UserSession.refresh_token_hash == token_hash).with_for_update())
     if session is None:
         raise HTTPException(401, "Invalid refresh token")
     now = datetime.now(timezone.utc)
     if session.revoked_at is not None:
-        # Reuse of a rotated token compromises the whole session family.
-        await db.execute(update(UserSession).where(
-            UserSession.family_id == session.family_id,
-            UserSession.revoked_at.is_(None),
-        ).values(revoked_at=now))
+        await db.execute(update(UserSession).where(UserSession.family_id == session.family_id,
+            UserSession.revoked_at.is_(None)).values(revoked_at=now))
         await db.commit()
         raise HTTPException(401, "Refresh token reuse detected; sign in again")
     if session.expires_at <= now:
@@ -334,30 +358,36 @@ async def refresh_account(payload: RefreshTokenRequest, db: AsyncSession = Depen
     refresh_token, replacement = _new_refresh_session(user.id, session.family_id)
     db.add(replacement)
     await db.commit()
-    return {
-        "user": {"id": str(user.id), "email": user.email},
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "token_type": "bearer",
-        "expires_in": settings.auth_access_token_seconds,
-    }
+    result = {"user": {"id": str(user.id), "email": user.email}, "token_type": "bearer",
+        "expires_in": settings.auth_access_token_seconds}
+    response = Response()
+    if _cookie_auth_requested(request) or (request and request.cookies.get("editflow_refresh")):
+        _set_auth_cookies(response, access_token, refresh_token)
+    else:
+        result.update({"access_token": access_token, "refresh_token": refresh_token})
+    import json
+    response.media_type = "application/json"
+    response.body = json.dumps(result, default=str).encode("utf-8")
+    return response
 
 
 @app.post("/v1/auth/logout")
-async def logout_account(payload: RefreshTokenRequest, db: AsyncSession = Depends(get_db)):
-    session = await db.scalar(
-        select(UserSession).where(
-            UserSession.refresh_token_hash == hash_refresh_token(payload.refresh_token)
-        ).with_for_update()
-    )
-    if session is not None and session.revoked_at is None:
-        now = datetime.now(timezone.utc)
-        await db.execute(update(UserSession).where(
-            UserSession.family_id == session.family_id,
-            UserSession.revoked_at.is_(None),
-        ).values(revoked_at=now))
-        await db.commit()
-    return {"revoked": True}
+async def logout_account(payload: RefreshTokenRequest | None = None, request: Request = None, db: AsyncSession = Depends(get_db)):
+    raw_refresh = payload.refresh_token if payload else (request.cookies.get("editflow_refresh") if request else None)
+    if raw_refresh:
+        session = await db.scalar(select(UserSession).where(
+            UserSession.refresh_token_hash == hash_refresh_token(raw_refresh)).with_for_update())
+        if session is not None and session.revoked_at is None:
+            now = datetime.now(timezone.utc)
+            await db.execute(update(UserSession).where(UserSession.family_id == session.family_id,
+                UserSession.revoked_at.is_(None)).values(revoked_at=now))
+            await db.commit()
+    response = Response()
+    _clear_auth_cookies(response)
+    import json
+    response.media_type = "application/json"
+    response.body = json.dumps({"revoked": True}).encode("utf-8")
+    return response
 
 
 @app.get("/v1/auth/me")
