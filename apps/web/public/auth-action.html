@@ -57,10 +57,15 @@
   const show = id => $(id).classList.remove("hidden");
   const hide = id => $(id).classList.add("hidden");
   function message(text, error=false) { status.textContent=text; status.classList.toggle("error",error); status.style.display="block"; show("status"); }
-  async function post(path, body, accessToken) {
-    const headers={"Content-Type":"application/json"};
-    if(accessToken) headers.Authorization="Bearer "+accessToken;
-    const response=await fetch(api+path,{method:"POST",headers,body:JSON.stringify(body)});
+  function csrfToken() {
+    const item=document.cookie.split("; ").find(value=>value.startsWith("editflow_csrf="));
+    return item ? decodeURIComponent(item.slice("editflow_csrf=".length)) : "";
+  }
+  async function post(path, body) {
+    const csrf=csrfToken();
+    const headers={"Content-Type":"application/json","X-Editflow-Cookie-Auth":"1"};
+    if(csrf) headers["X-CSRF-Token"]=csrf;
+    const response=await fetch(api+path,{method:"POST",credentials:"include",headers,body:JSON.stringify(body)});
     const data=await response.json().catch(()=>({}));
     if(!response.ok) throw new Error(data.detail || data.message || "Request failed ("+response.status+")");
     return data;
@@ -108,9 +113,7 @@
       event.preventDefault(); $("primary").disabled=true;
       try {
         const session=await post("/v1/auth/login",{email:$("email").value,password:$("login-password").value});
-        const result=await post("/v1/invitations/accept",{token},session.access_token);
-        sessionStorage.setItem("editflow-access-token",session.access_token);
-        sessionStorage.setItem("editflow-refresh-token",session.refresh_token);
+        const result=await post("/v1/invitations/accept",{token});
         sessionStorage.setItem("editflow-user-email",session.user?.email || $("email").value);
         message("Invitation accepted. Opening EDITFLOW AI…");
         window.setTimeout(()=>{ location.href="/"; },900);
