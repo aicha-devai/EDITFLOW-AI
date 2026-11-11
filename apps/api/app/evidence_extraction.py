@@ -72,7 +72,7 @@ async def _scene_change_timestamps(video_path: str, threshold: float, timeout_se
             "-vf", f"select='gt(scene,{threshold})',showinfo", "-an", "-f", "null", "-",
         ], timeout_seconds)
         return [float(value) for value in re.findall(
-            r"pts_time:([0-9]+(?:\\.[0-9]+)?)",
+            r"pts_time:([0-9]+(?:\.[0-9]+)?)",
             stderr.decode("utf-8", errors="replace"),
         )]
 
