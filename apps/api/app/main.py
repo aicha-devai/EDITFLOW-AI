@@ -458,8 +458,8 @@ async def accept_project_invitation(
         owner = await db.scalar(select(User).where(User.id == project.owner_id))
         db.add(ProjectAuditEvent(
             project_id=project.id,
-            actor_user_id=project.owner_id,
-            actor_email=owner.email if owner else "unknown",
+            actor_user_id=current_user.id,
+            actor_email=current_user.email,
             target_user_id=current_user.id,
             target_email=current_user.email,
             action=action,
