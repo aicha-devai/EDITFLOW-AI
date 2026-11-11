@@ -32,12 +32,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Verify FFmpeg is available on the GitHub-hosted runner
-        run: |
-          command -v ffmpeg
-          ffmpeg -version
       - name: Install API dependencies
         run: pip install -r apps/api/requirements.txt
+      - name: Install bundled FFmpeg for real render integration tests
+        run: |
+          python -m pip install --disable-pip-version-check imageio-ffmpeg
+          FFMPEG_PATH="$(python -c 'import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())')"
+          sudo ln -sf "$FFMPEG_PATH" /usr/local/bin/ffmpeg
+          ffmpeg -version
+          ffmpeg -encoders | grep -q libx264
       - name: Apply database migrations
         working-directory: apps/api
         env:
