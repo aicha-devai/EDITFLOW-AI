@@ -201,3 +201,26 @@ test("account panel exposes resend verification and owner invitation controls", 
   await page.locator("#send-invitation").click();
   await expect(page.locator("#account-message")).toContainText("Invitation email sent");
 });
+
+test("invitation acceptance stores the authenticated session and returns to the app", async ({ page }) => {
+  await page.route("**/v1/auth/login", async route => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
+      user: { id: "user-1", email: "invited@example.com" },
+      access_token: "accepted-access-token",
+      refresh_token: "accepted-refresh-token",
+      token_type: "bearer",
+    }) });
+  });
+  await page.route("**/v1/invitations/accept", async route => {
+    expect(route.request().headers()["authorization"]).toBe("Bearer accepted-access-token");
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ accepted: true, project_id: projectId, role: "editor" }) });
+  });
+  await page.goto("/auth-action.html?action=accept-invitation&token=invitation-token-012345678901234567890123456789");
+  await page.locator("#email").fill("invited@example.com");
+  await page.locator("#login-password").fill("example-test-only-value");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByText("Invitation accepted. Opening EDITFLOW AI…")).toBeVisible();
+  await expect.poll(() => page.evaluate(() => location.pathname)).toBe("/");
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem("editflow-access-token"))).toBe("accepted-access-token");
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem("editflow-user-email"))).toBe("invited@example.com");
+});
