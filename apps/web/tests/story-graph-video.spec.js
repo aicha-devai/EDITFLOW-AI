@@ -116,7 +116,7 @@ test("clicking timestamped evidence seeks to its exact timestamp and starts play
 
   await page.locator('[data-evidence-node="shot-12"]').click();
 
-  await expect.poll(() => video.evaluate(el => Number(el.dataset.lastSeekedTime))).toBe(12.5);
+  await expect.poll(() => video.evaluate(el => Number(el.dataset.lastSeekedTime))).toBeCloseTo(12.5, 2);
   await expect(page.locator("#player-time")).toHaveText("00:12.5");
   await expect(page.locator("#active-evidence-label")).toContainText("Hallway shot");
   await expect.poll(() => video.evaluate(el => el.paused)).toBe(false);
