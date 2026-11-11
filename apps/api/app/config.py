@@ -7,6 +7,8 @@ class Settings(BaseSettings):
     api_title: str = "EDITFLOW AI API"
     auth_secret: str | None = Field(default=None, validation_alias="EDITFLOW_AUTH_SECRET")
     auth_access_token_seconds: int = Field(default=900, ge=300, le=3600, validation_alias="EDITFLOW_AUTH_ACCESS_TOKEN_SECONDS")
+    auth_secret: str | None = Field(default=None, validation_alias="EDITFLOW_AUTH_SECRET")
+    auth_access_token_seconds: int = Field(default=900, ge=300, le=3600, validation_alias="EDITFLOW_AUTH_ACCESS_TOKEN_SECONDS")
     storage_backend: str = Field(default="local", validation_alias="EDITFLOW_STORAGE_BACKEND")
     storage_root: str = Field(default="/var/lib/editflow", validation_alias="EDITFLOW_STORAGE_ROOT")
     s3_bucket: str | None = None
