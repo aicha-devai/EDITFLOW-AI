@@ -559,6 +559,8 @@ async function signIn() {
     const body=await response.json().catch(()=>({}));
     if(!response.ok) throw new Error(body.detail || "Sign in failed");
     saveSession(body,email);
+    state.studioProjectsLoaded=false;
+    render();
     accountMessage("Signed in successfully.");
   } catch(error) { accountMessage(error.message || "Could not sign in.",true); }
 }
