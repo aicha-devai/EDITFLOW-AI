@@ -6,12 +6,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.db import get_db
 from app.rendering import create_render_job, get_render_job, request_render_cancellation, RenderJobNotFound
-from sqlalchemy import select
+from sqlalchemy import select, or_, delete
 from sqlalchemy.exc import IntegrityError
-from app.models import Project, RenderJob, User
+from app.models import Project, RenderJob, User, ProjectMember
 from app.schemas import (
     ProjectCreate, SaveTimelineRequest, RestoreRequest, CreateRenderRequest,
-    QCCriticApprovalRequest, AuthRegisterRequest, AuthLoginRequest,
+    QCCriticApprovalRequest, AuthRegisterRequest, AuthLoginRequest, ProjectMemberUpsert,
 )
 from app.qc_critic import (
     generate_qc_critic_proposals, approve_qc_intent_proposals,
@@ -51,6 +51,41 @@ async def require_owned_project(
     if project is None:
         # Do not reveal whether another user's project exists.
         raise HTTPException(404, "Project not found")
+    return project
+
+
+
+async def require_project_access(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Project:
+    project = await db.scalar(
+        select(Project)
+        .outerjoin(ProjectMember, ProjectMember.project_id == Project.id)
+        .where(
+            Project.id == project_id,
+            or_(Project.owner_id == current_user.id, ProjectMember.user_id == current_user.id),
+        )
+    )
+    if project is None:
+        raise HTTPException(404, "Project not found")
+    return project
+
+
+async def require_project_editor(
+    project: Project = Depends(require_project_access),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Project:
+    if project.owner_id == current_user.id:
+        return project
+    role = await db.scalar(select(ProjectMember.role).where(
+        ProjectMember.project_id == project.id,
+        ProjectMember.user_id == current_user.id,
+    ))
+    if role != "editor":
+        raise HTTPException(403, "Editor role is required for this operation")
     return project
 
 
@@ -106,8 +141,76 @@ async def create_project(payload: ProjectCreate, db: AsyncSession = Depends(get_
     await db.refresh(project)
     return {"id": str(project.id), "title": project.title, "current_version_id": None}
 
+
+@app.get("/v1/projects/{project_id}/members")
+async def list_project_members(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    _owned_project: Project = Depends(require_owned_project),
+):
+    owner = await db.scalar(select(User).where(User.id == _owned_project.owner_id))
+    members = (await db.execute(
+        select(ProjectMember, User)
+        .join(User, User.id == ProjectMember.user_id)
+        .where(ProjectMember.project_id == project_id)
+        .order_by(User.email)
+    )).all()
+    result = []
+    if owner is not None:
+        result.append({"user_id": str(owner.id), "email": owner.email, "role": "owner"})
+    result.extend({
+        "user_id": str(member.user_id),
+        "email": user.email,
+        "role": member.role,
+        "created_at": member.created_at,
+    } for member, user in members)
+    return result
+
+
+@app.post("/v1/projects/{project_id}/members", status_code=200)
+async def upsert_project_member(
+    project_id: UUID,
+    payload: ProjectMemberUpsert,
+    db: AsyncSession = Depends(get_db),
+    _owned_project: Project = Depends(require_owned_project),
+):
+    user = await db.scalar(select(User).where(User.email == payload.email, User.is_active.is_(True)))
+    if user is None:
+        raise HTTPException(404, "An active account with this email was not found")
+    if user.id == _owned_project.owner_id:
+        raise HTTPException(409, "The project owner already has full access")
+    member = await db.scalar(select(ProjectMember).where(
+        ProjectMember.project_id == project_id,
+        ProjectMember.user_id == user.id,
+    ))
+    if member is None:
+        member = ProjectMember(project_id=project_id, user_id=user.id, role=payload.role)
+        db.add(member)
+    else:
+        member.role = payload.role
+    await db.commit()
+    await db.refresh(member)
+    return {"user_id": str(user.id), "email": user.email, "role": member.role}
+
+
+@app.delete("/v1/projects/{project_id}/members/{member_user_id}", status_code=204)
+async def remove_project_member(
+    project_id: UUID,
+    member_user_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    _owned_project: Project = Depends(require_owned_project),
+):
+    result = await db.execute(delete(ProjectMember).where(
+        ProjectMember.project_id == project_id,
+        ProjectMember.user_id == member_user_id,
+    ))
+    if result.rowcount == 0:
+        raise HTTPException(404, "Project member not found")
+    await db.commit()
+    return None
+
 @app.post("/v1/projects/{project_id}/timeline")
-async def save_project_timeline(project_id: UUID, payload: SaveTimelineRequest, db: AsyncSession = Depends(get_db), _owned_project: Project = Depends(require_owned_project)):
+async def save_project_timeline(project_id: UUID, payload: SaveTimelineRequest, db: AsyncSession = Depends(get_db), _owned_project: Project = Depends(require_project_editor)):
     try:
         async with db.begin():
             row, created = await save_timeline(
@@ -124,7 +227,7 @@ async def save_project_timeline(project_id: UUID, payload: SaveTimelineRequest, 
         raise HTTPException(422, str(exc))
 
 @app.get("/v1/projects/{project_id}/versions")
-async def get_versions(project_id: UUID, db: AsyncSession = Depends(get_db), _owned_project: Project = Depends(require_owned_project)):
+async def get_versions(project_id: UUID, db: AsyncSession = Depends(get_db), _owned_project: Project = Depends(require_project_access)):
     rows = await list_versions(db, project_id)
     return [{
         "id": str(r.id), "version": r.version, "parent_version_id": str(r.parent_version_id) if r.parent_version_id else None,
@@ -133,14 +236,14 @@ async def get_versions(project_id: UUID, db: AsyncSession = Depends(get_db), _ow
     } for r in rows]
 
 @app.get("/v1/projects/{project_id}/versions/compare")
-async def compare_project_versions(project_id: UUID, from_version: int, to_version: int, db: AsyncSession = Depends(get_db), _owned_project: Project = Depends(require_owned_project)):
+async def compare_project_versions(project_id: UUID, from_version: int, to_version: int, db: AsyncSession = Depends(get_db), _owned_project: Project = Depends(require_project_access)):
     try:
         return await compare_versions(db, project_id, from_version, to_version)
     except LookupError as exc:
         raise HTTPException(404, str(exc))
 
 @app.post("/v1/projects/{project_id}/versions/{source_version}/restore")
-async def restore_project_version(project_id: UUID, source_version: int, payload: RestoreRequest, db: AsyncSession = Depends(get_db), _owned_project: Project = Depends(require_owned_project)):
+async def restore_project_version(project_id: UUID, source_version: int, payload: RestoreRequest, db: AsyncSession = Depends(get_db), _owned_project: Project = Depends(require_project_editor)):
     try:
         async with db.begin():
             row, created = await restore_version(
@@ -157,7 +260,7 @@ async def restore_project_version(project_id: UUID, source_version: int, payload
 
 
 @app.post("/v1/projects/{project_id}/renders", status_code=202)
-async def create_project_render(project_id: UUID, payload: CreateRenderRequest, db: AsyncSession = Depends(get_db), _owned_project: Project = Depends(require_owned_project)):
+async def create_project_render(project_id: UUID, payload: CreateRenderRequest, db: AsyncSession = Depends(get_db), _owned_project: Project = Depends(require_project_editor)):
     try:
         async with db.begin():
             job, created = await create_render_job(
@@ -182,7 +285,7 @@ async def create_project_render(project_id: UUID, payload: CreateRenderRequest, 
         raise HTTPException(422, str(exc))
 
 @app.get("/v1/projects/{project_id}/renders/{job_id}")
-async def get_project_render(project_id: UUID, job_id: UUID, db: AsyncSession = Depends(get_db), _owned_project: Project = Depends(require_owned_project)):
+async def get_project_render(project_id: UUID, job_id: UUID, db: AsyncSession = Depends(get_db), _owned_project: Project = Depends(require_project_access)):
     try:
         job = await get_render_job(db, project_id, job_id)
         return {
@@ -208,7 +311,7 @@ async def get_project_render(project_id: UUID, job_id: UUID, db: AsyncSession = 
 
 
 @app.get("/v1/projects/{project_id}/renders/{job_id}/media")
-async def stream_project_render_media(project_id: UUID, job_id: UUID, db: AsyncSession = Depends(get_db), _owned_project: Project = Depends(require_owned_project)):
+async def stream_project_render_media(project_id: UUID, job_id: UUID, db: AsyncSession = Depends(get_db), _owned_project: Project = Depends(require_project_access)):
     """Serve the immutable rendered MP4 with browser seeking / HTTP range support."""
     job = await db.scalar(select(RenderJob).where(
         RenderJob.id == job_id, RenderJob.project_id == project_id
@@ -239,7 +342,7 @@ async def stream_project_render_media(project_id: UUID, job_id: UUID, db: AsyncS
         raise HTTPException(404, "Rendered media could not be resolved") from exc
 
 @app.post("/v1/projects/{project_id}/renders/{job_id}/cancel")
-async def cancel_project_render(project_id: UUID, job_id: UUID, db: AsyncSession = Depends(get_db), _owned_project: Project = Depends(require_owned_project)):
+async def cancel_project_render(project_id: UUID, job_id: UUID, db: AsyncSession = Depends(get_db), _owned_project: Project = Depends(require_project_editor)):
     try:
         async with db.begin():
             job = await request_render_cancellation(db, project_id, job_id)
@@ -253,7 +356,7 @@ async def cancel_project_render(project_id: UUID, job_id: UUID, db: AsyncSession
 
 
 @app.get("/v1/projects/{project_id}/renders/{job_id}/qc-critic")
-async def get_qc_critic_suggestions(project_id: UUID, job_id: UUID, db: AsyncSession = Depends(get_db), _owned_project: Project = Depends(require_owned_project)):
+async def get_qc_critic_suggestions(project_id: UUID, job_id: UUID, db: AsyncSession = Depends(get_db), _owned_project: Project = Depends(require_project_access)):
     job = await db.scalar(select(RenderJob).where(
         RenderJob.id == job_id, RenderJob.project_id == project_id
     ))
@@ -269,7 +372,7 @@ async def get_qc_critic_suggestions(project_id: UUID, job_id: UUID, db: AsyncSes
 
 
 @app.get("/v1/projects/{project_id}/renders/{job_id}/story-continuity")
-async def get_story_continuity_graph(project_id: UUID, job_id: UUID, db: AsyncSession = Depends(get_db), _owned_project: Project = Depends(require_owned_project)):
+async def get_story_continuity_graph(project_id: UUID, job_id: UUID, db: AsyncSession = Depends(get_db), _owned_project: Project = Depends(require_project_access)):
     job = await db.scalar(select(RenderJob).where(
         RenderJob.id == job_id, RenderJob.project_id == project_id
     ))
