@@ -68,7 +68,7 @@ def validate_production_settings() -> None:
     public_url = urlsplit(settings.email_public_url)
     if public_url.scheme != "https" or not public_url.hostname or public_url.username or public_url.password or public_url.path not in {"", "/"} or public_url.query or public_url.fragment:
         problems.append("EDITFLOW_EMAIL_PUBLIC_URL must be an HTTPS origin")
-    if not settings.email_smtp_host or not settings.email_from or "\\r" in (settings.email_from or "") or "\\n" in (settings.email_from or ""):
+    if not settings.email_smtp_host or not settings.email_from or "\r" in (settings.email_from or "") or "\n" in (settings.email_from or ""):
         problems.append("SMTP host and sender address must be configured")
     if settings.email_use_ssl == settings.email_starttls:
         problems.append("Configure exactly one SMTP transport mode: SSL or STARTTLS")
