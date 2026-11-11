@@ -426,3 +426,61 @@ async def test_invitation_is_bound_to_verified_email_and_single_use(db_session, 
             ActionTokenRequest(token=token), db_session, current_user=invitee
         )
     assert replay.value.status_code == 400
+
+
+
+@pytest.mark.asyncio
+async def test_legacy_project_claim_is_dry_run_by_default_and_audited_on_apply(db_session):
+    from app.models import Project, ProjectAuditEvent, User
+    from app.scripts.claim_legacy_project import claim_legacy_project
+
+    owner = User(email="legacy-owner@example.com", password_hash=hash_password("long enough password"), is_email_verified=True)
+    project = Project(title="Imported legacy project", owner_id=None)
+    db_session.add_all([owner, project])
+    await db_session.flush()
+
+    preview = await claim_legacy_project(
+        db_session, project.id, owner.email, "ops-ticket-42", "Customer ownership verified from original invoice", apply=False
+    )
+    assert preview["dry_run"] is True
+    await db_session.refresh(project)
+    assert project.owner_id is None
+
+    applied = await claim_legacy_project(
+        db_session, project.id, owner.email, "ops-ticket-42", "Customer ownership verified from original invoice", apply=True
+    )
+    assert applied["applied"] is True
+    await db_session.refresh(project)
+    assert project.owner_id == owner.id
+    event = await db_session.scalar(
+        __import__("sqlalchemy").select(ProjectAuditEvent).where(
+            ProjectAuditEvent.project_id == project.id,
+            ProjectAuditEvent.action == "ownership.claimed",
+        )
+    )
+    assert event is not None
+    assert event.actor_email == "admin:ops-ticket-42"
+    assert event.target_user_id == owner.id
+    assert "original invoice" in event.details
+
+
+@pytest.mark.asyncio
+async def test_legacy_project_claim_refuses_unverified_or_already_owned_accounts(db_session):
+    from app.models import Project, User
+    from app.scripts.claim_legacy_project import claim_legacy_project
+
+    unverified = User(email="unverified-legacy@example.com", password_hash=hash_password("long enough password"), is_email_verified=False)
+    existing_owner = User(email="existing-owner@example.com", password_hash=hash_password("long enough password"), is_email_verified=True)
+    db_session.add_all([unverified, existing_owner])
+    await db_session.flush()
+    unowned = Project(title="Unclaimed project")
+    owned = Project(title="Already owned project", owner_id=existing_owner.id)
+    db_session.add_all([unowned, owned])
+    await db_session.flush()
+
+    with pytest.raises(ValueError, match="email-verified"):
+        await claim_legacy_project(db_session, unowned.id, unverified.email, "ops-1", "Verification check", apply=True)
+    with pytest.raises(ValueError, match="already has an owner"):
+        await claim_legacy_project(db_session, owned.id, existing_owner.email, "ops-1", "No overwrite", apply=True)
+    await db_session.refresh(unowned)
+    assert unowned.owner_id is None
