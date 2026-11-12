@@ -29,7 +29,7 @@ services:
       - "8000"
     networks:
       - frontend
-      - data
+      - api-egress
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=256m,uid=10001,gid=10001,mode=1770
@@ -55,7 +55,7 @@ services:
       target: worker
     command: ["python", "-m", "app.worker_main"]
     networks:
-      - data
+      - worker-egress
     environment:
       EDITFLOW_ENV: production
       DATABASE_URL: ${DATABASE_URL:?Set managed PostgreSQL URL with TLS}
@@ -146,5 +146,7 @@ services:
 networks:
   frontend:
     driver: bridge
-  data:
+  api-egress:
+    driver: bridge
+  worker-egress:
     driver: bridge
