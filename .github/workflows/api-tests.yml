@@ -192,6 +192,16 @@ jobs:
       - name: Verify web runtime is non-root and Nginx configuration is valid
         run: docker run --rm --entrypoint sh editflow-web:sbom -c 'set -eu; test "$(id -u)" = "101"; nginx -t'
 
+      - name: Validate public Nginx proxy configuration
+        run: |
+          mkdir -p deploy/tls
+          openssl req -x509 -nodes -newkey rsa:2048 -keyout deploy/tls/privkey.pem -out deploy/tls/fullchain.pem -subj "/CN=localhost" -days 1 >/dev/null 2>&1
+          chmod 644 deploy/tls/privkey.pem
+          docker run --rm --add-host api:127.0.0.1 --add-host web:127.0.0.1 \
+            -v "$PWD/deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro" \
+            -v "$PWD/deploy/tls:/etc/nginx/tls:ro" \
+            --entrypoint nginx editflow-web:sbom -t
+
       - name: Generate CycloneDX SBOM for web runtime image
         uses: anchore/sbom-action@v0
         with:
