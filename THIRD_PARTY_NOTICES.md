@@ -74,3 +74,9 @@ These repositories were inspected for architectural ideas only. EDITFLOW AI does
 - FFmpeg legal/licensing guidance: https://www.ffmpeg.org/legal.html
 - OpenCV-Python wheel licensing statement (including bundled FFmpeg LGPLv2.1): https://github.com/opencv/opencv-python#licensing
 - OpenCV licensing (Apache-2.0 for OpenCV 4.5.0+): https://opencv.org/license/
+
+## Web container and JavaScript dependency scope
+
+- The web Dockerfile has a Node build stage (`node:22-alpine`) and an Nginx runtime stage (`nginx:1.27-alpine`). CI now generates separate SBOMs for both images so build-time npm dependencies are not hidden by the multi-stage runtime image.
+- The web package manifest currently has no committed `package-lock.json`; the Dockerfile runs `npm install`. The generated SBOM records the exact resolved dependency tree for that CI build, but future builds can resolve different versions within the semver ranges.
+- Both base image tags are floating. Pin the Node and Nginx images by digest and commit a reviewed npm lockfile before treating the web build as reproducible for a customer-distributed release.
