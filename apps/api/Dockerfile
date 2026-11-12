@@ -14,7 +14,7 @@ RUN set -eux; \
       "Check-Valid-Until: no" \
       "" \
       "Types: deb" \
-      "URIs: https://snapshot.debian.org/archive/debian-security/\${DEBIAN_SNAPSHOT}" \
+      "URIs: https://snapshot.debian.org/archive/debian-security/${DEBIAN_SNAPSHOT}" \
       "Suites: trixie-security" \
       "Components: main" \
       "Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg" \
