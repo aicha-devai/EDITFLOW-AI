@@ -33,8 +33,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY --chown=10001:10001 app ./app
 COPY --chown=10001:10001 alembic ./alembic
 COPY --chown=10001:10001 alembic.ini ./alembic.ini
-RUN groupadd --gid 10001 editflow && \
-    useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin editflow
+RUN printf 'editflow:x:10001:10001:EDITFLOW runtime:/nonexistent:/usr/sbin/nologin\\n' >> /etc/passwd && \\
+    printf 'editflow:x:10001:\\n' >> /etc/group
 
 # Only the isolated render worker receives FFmpeg/FFprobe. It runs as the same
 # unprivileged UID and is additionally sandboxed by the production Compose file.
