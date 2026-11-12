@@ -81,11 +81,19 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build the API image from its production Dockerfile
-        run: docker build --pull -t editflow-api:sbom ./apps/api
+        run: docker build --pull --target api -t editflow-api:sbom ./apps/api
 
-      - name: Verify test-only dependencies are absent from production API image
+      - name: Verify API image is unprivileged and excludes FFmpeg executables
         run: |
+          docker run --rm --entrypoint sh editflow-api:sbom -c 'set -eu; test "$(id -u)" = "10001"; ! command -v ffmpeg >/dev/null 2>&1; ! command -v ffprobe >/dev/null 2>&1'
           docker run --rm --entrypoint python editflow-api:sbom -c 'import importlib.util; assert importlib.util.find_spec("pytest") is None; assert importlib.util.find_spec("pytest_asyncio") is None'
+
+      - name: Build isolated media worker image
+        run: docker build --pull --target worker -t editflow-worker:sbom ./apps/api
+
+      - name: Verify media worker is unprivileged and has pinned FFmpeg tools
+        run: |
+          docker run --rm --entrypoint sh editflow-worker:sbom -c 'set -eu; test "$(id -u)" = "10001"; test "$(dpkg-query -W -f="\${Version}" ffmpeg)" = "7:7.1.5-0+deb13u1"; ffmpeg -version; ffprobe -version'
 
       - name: Prepare SBOM output directory
         run: mkdir -p sbom
@@ -96,6 +104,14 @@ jobs:
           image: editflow-api:sbom
           format: cyclonedx-json
           output-file: sbom/editflow-api.cdx.json
+          upload-artifact: false
+
+      - name: Generate CycloneDX SBOM for isolated media worker image
+        uses: anchore/sbom-action@v0
+        with:
+          image: editflow-worker:sbom
+          format: cyclonedx-json
+          output-file: sbom/editflow-worker.cdx.json
           upload-artifact: false
 
       - name: Record pinned production base image references
@@ -109,7 +125,7 @@ jobs:
 
       - name: Capture FFmpeg build configuration and OS package versions
         run: |
-          docker run --rm --entrypoint sh editflow-api:sbom -c 'set -eu
+          docker run --rm --entrypoint sh editflow-worker:sbom -c 'set -eu
             test "$(dpkg-query -W -f="\${Version}" ffmpeg)" = "7:7.1.5-0+deb13u1"
             echo "=== FFmpeg Debian package version pin: verified ==="
             echo "=== Python version ==="
@@ -168,6 +184,9 @@ jobs:
           output-file: sbom/editflow-web-runtime.cdx.json
           upload-artifact: false
 
+      - name: Create worker license metadata inventory
+        run: python tools/sbom_license_inventory.py sbom/editflow-worker.cdx.json sbom/worker-license-inventory.csv
+
       - name: Scan API production image with Trivy
         id: trivy_api
         continue-on-error: true
@@ -177,11 +196,26 @@ jobs:
           image-ref: editflow-api:sbom
           version: v0.76.2
           vuln-type: os,library
-          severity: HIGH,CRITICAL
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
           ignore-unfixed: false
           exit-code: '1'
           format: json
           output: sbom/trivy-api-vulnerabilities.json
+
+      - name: Scan isolated media worker image with Trivy
+        id: trivy_worker
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: editflow-worker:sbom
+          version: v0.76.2
+          vuln-type: os,library
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          ignore-unfixed: false
+          exit-code: '1'
+          format: json
+          output: sbom/trivy-worker-vulnerabilities.json
 
       - name: Scan web production image with Trivy
         id: trivy_web
@@ -233,10 +267,11 @@ jobs:
         if: always()
         env:
           API_SCAN_OUTCOME: ${{ steps.trivy_api.outcome }}
+          WORKER_SCAN_OUTCOME: ${{ steps.trivy_worker.outcome }}
           WEB_SCAN_OUTCOME: ${{ steps.trivy_web.outcome }}
         run: |
           set -eu
-          if [ "$API_SCAN_OUTCOME" != "success" ] || [ "$WEB_SCAN_OUTCOME" != "success" ]; then
-            echo "::error::Trivy found HIGH/CRITICAL vulnerabilities or a scan failed. Inspect the uploaded JSON reports before approving this PR."
+          if [ "$API_SCAN_OUTCOME" != "success" ] || [ "$WORKER_SCAN_OUTCOME" != "success" ] || [ "$WEB_SCAN_OUTCOME" != "success" ]; then
+            echo "::error::Trivy found one or more known vulnerabilities at any severity, or a scan failed. Inspect all uploaded JSON reports before approving this PR."
             exit 1
           fi
