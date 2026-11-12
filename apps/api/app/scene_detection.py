@@ -31,7 +31,9 @@ def detect_scene_changes(video_path: str, threshold: float = 0.30) -> list[float
 
         video = open_video(str(video_path))
         manager = SceneManager()
-        manager.add_detector(ContentDetector(threshold=threshold * 100.0))
+        # Preserve the previous FFmpeg detector's ability to report short scenes;
+        # PySceneDetect's default 15-frame minimum can hide cuts in short clips.
+        manager.add_detector(ContentDetector(threshold=threshold * 100.0, min_scene_len=1))
         manager.detect_scenes(video, show_progress=False)
         scenes = manager.get_scene_list()
         boundaries = [float(start.get_seconds()) for start, _end in scenes[1:]]
