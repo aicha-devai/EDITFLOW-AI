@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Export declared component license metadata from a CycloneDX JSON SBOM.
+"""Export package license metadata from a CycloneDX JSON container SBOM.
 
-This is an inventory aid, not a legal conclusion: missing metadata must be
-resolved against the upstream package and the exact binary/build distribution.
+The CSV is an audit index, not a legal conclusion. License strings collected
+from distro package metadata may describe licenses of individual files within
+a source package; they are listed as a set, not treated as SPDX OR choices.
 """
 from __future__ import annotations
 
@@ -11,6 +12,15 @@ import json
 import sys
 from pathlib import Path
 from typing import Any
+
+
+# Syft identifies FFmpeg libraries bundled in the opencv-python-headless wheel
+# as a separate binary component. The upstream wheel project states that its
+# bundled FFmpeg is LGPLv2.1. Python runtime licensing is PSF-2.0.
+MANUAL_LICENSES = {
+    ("ffmpeg", "8.1.1"): ("LGPL-2.1", "opencv-python wheel licensing notice"),
+    ("python", "3.12.16"): ("PSF-2.0", "Python Software Foundation License"),
+}
 
 
 def license_labels(component: dict[str, Any]) -> list[str]:
@@ -43,34 +53,63 @@ def main() -> int:
         if not isinstance(component, dict):
             continue
         component_type = component.get("type", "")
-        # Syft also emits thousands of file-level components. They are useful
-        # provenance evidence but are not independently installable packages.
-        # Exclude them, and discard binary-signature false positives without a
-        # package URL (for example pip's bundled Windows launcher executables).
+        # Syft emits many file-level components; they are provenance evidence,
+        # not separately installable packages. Drop binary false positives
+        # without a package URL (e.g. pip's bundled Windows launcher files).
         if component_type == "file":
             continue
         if component_type == "application" and not component.get("purl"):
             continue
         if component_type not in {"library", "application", "operating-system"}:
             continue
-        licenses = license_labels(component)
+
+        name = component.get("name", "")
+        version = component.get("version", "")
+        labels = license_labels(component)
+        manual = MANUAL_LICENSES.get((name.lower(), version))
+        if manual:
+            license_text, basis = manual
+            status = "manual_override"
+        elif labels:
+            # Keep the metadata values distinct. They may represent multiple
+            # file-level licenses in a Debian source package, not alternatives.
+            license_text = "; ".join(labels)
+            basis = "CycloneDX/Syft package metadata"
+            status = "metadata_present"
+        elif component_type == "operating-system":
+            license_text = ""
+            basis = "distribution aggregate; see individual OS package rows"
+            status = "aggregate_distribution"
+        else:
+            license_text = ""
+            basis = "missing from SBOM metadata"
+            status = "review_required"
+
         rows.append({
-            "name": component.get("name", ""),
-            "version": component.get("version", ""),
-            "type": component.get("type", ""),
+            "name": name,
+            "version": version,
+            "type": component_type,
             "purl": component.get("purl", ""),
-            "declared_licenses": " OR ".join(licenses),
-            "license_metadata_status": "declared" if licenses else "review_required",
+            "license_metadata": license_text,
+            "license_basis": basis,
+            "license_review_status": status,
         })
+
     rows.sort(key=lambda row: (row["type"], row["name"].lower(), row["version"]))
+    fields = [
+        "name", "version", "type", "purl", "license_metadata",
+        "license_basis", "license_review_status",
+    ]
     with destination.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(rows[0]) if rows else [
-            "name", "version", "type", "purl", "declared_licenses", "license_metadata_status"
-        ])
+        writer = csv.DictWriter(handle, fieldnames=fields)
         writer.writeheader()
         writer.writerows(rows)
-    missing = sum(row["license_metadata_status"] == "review_required" for row in rows)
-    print(f"SBOM components: {len(rows)}; components requiring license metadata review: {missing}")
+
+    counts: dict[str, int] = {}
+    for row in rows:
+        status = row["license_review_status"]
+        counts[status] = counts.get(status, 0) + 1
+    print(f"SBOM package components: {len(rows)}; license review statuses: {counts}")
     return 0
 
 
