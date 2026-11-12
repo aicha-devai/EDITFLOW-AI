@@ -20,6 +20,18 @@ from typing import Any
 MANUAL_LICENSES = {
     ("ffmpeg", "8.1.1"): ("LGPL-2.1", "opencv-python wheel licensing notice"),
     ("python", "3.12.16"): ("PSF-2.0", "Python Software Foundation License"),
+    ("node", "22.23.5"): ("MIT", "Node.js upstream LICENSE"),
+    ("github.com/evanw/esbuild", "v0.0.0-20251101233416-208f539945b1"): (
+        "MIT", "esbuild upstream LICENSE"
+    ),
+    ("golang.org/x/sys", "v0.0.0-20220715151400-c0bba94af5f8"): (
+        "BSD-3-Clause", "golang.org/x/sys upstream LICENSE"
+    ),
+}
+INTERNAL_COMPONENTS = {
+    "editflow-story-graph-explorer": (
+        "first-party application package; not a third-party dependency"
+    ),
 }
 
 
@@ -66,8 +78,13 @@ def main() -> int:
         name = component.get("name", "")
         version = component.get("version", "")
         labels = license_labels(component)
+        internal_basis = INTERNAL_COMPONENTS.get(name.lower())
         manual = MANUAL_LICENSES.get((name.lower(), version))
-        if manual:
+        if internal_basis:
+            license_text = ""
+            basis = internal_basis
+            status = "internal_project"
+        elif manual:
             license_text, basis = manual
             status = "manual_override"
         elif labels:
