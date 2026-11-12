@@ -42,6 +42,17 @@ def main() -> int:
     for component in components:
         if not isinstance(component, dict):
             continue
+        component_type = component.get("type", "")
+        # Syft also emits thousands of file-level components. They are useful
+        # provenance evidence but are not independently installable packages.
+        # Exclude them, and discard binary-signature false positives without a
+        # package URL (for example pip's bundled Windows launcher executables).
+        if component_type == "file":
+            continue
+        if component_type == "application" and not component.get("purl"):
+            continue
+        if component_type not in {"library", "application", "operating-system"}:
+            continue
         licenses = license_labels(component)
         rows.append({
             "name": component.get("name", ""),
