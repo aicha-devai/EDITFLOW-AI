@@ -83,6 +83,10 @@ jobs:
       - name: Build the API image from its production Dockerfile
         run: docker build --pull -t editflow-api:sbom ./apps/api
 
+      - name: Verify test-only dependencies are absent from production API image
+        run: |
+          docker run --rm --entrypoint python editflow-api:sbom -c 'import importlib.util; assert importlib.util.find_spec("pytest") is None; assert importlib.util.find_spec("pytest_asyncio") is None'
+
       - name: Prepare SBOM output directory
         run: mkdir -p sbom
 
@@ -106,6 +110,10 @@ jobs:
       - name: Capture FFmpeg build configuration and OS package versions
         run: |
           docker run --rm --entrypoint sh editflow-api:sbom -c 'set -eu
+            test "$(dpkg-query -W -f="${Version}" ffmpeg)" = "7:7.1.5-0+deb13u1"
+            echo "=== FFmpeg Debian package version pin: verified ==="
+            echo "=== Python version ==="
+            python --version
             echo "=== FFmpeg version ==="
             ffmpeg -version
             echo "=== FFmpeg build configuration ==="
@@ -143,6 +151,7 @@ jobs:
         run: |
           docker run --rm -v "$PWD/sbom:/out" --entrypoint sh editflow-web-build:sbom -c 'set -eu
             cp /app/package-lock.json /out/web-package-lock.generated.json
+            test "$(node --version)" = "v22.23.5"
             node --version
             npm --version
             npm ls --all --json > /out/web-build-dependencies.json || true
