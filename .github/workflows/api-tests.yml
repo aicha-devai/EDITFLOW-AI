@@ -52,7 +52,7 @@ jobs:
           node-version: "22.23.5"
       - name: Install web dependencies
         working-directory: apps/web
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Install Playwright Chromium
         working-directory: apps/web
         run: npx playwright install --with-deps chromium
