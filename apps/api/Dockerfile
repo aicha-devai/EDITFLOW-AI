@@ -5,7 +5,7 @@ FROM python:3.12.16-slim-trixie@sha256:4840d514c583a4d3d8cad3940e68dee6f0f6f3635
 ARG DEBIAN_SNAPSHOT=20261112T000000Z
 RUN set -eux; \
     rm -f /etc/apt/sources.list /etc/apt/sources.list.d/*; \
-    printf '%s\\n' \
+    printf '%s\n' \
       "Types: deb" \
       "URIs: https://snapshot.debian.org/archive/debian/${DEBIAN_SNAPSHOT}" \
       "Suites: trixie trixie-updates" \
