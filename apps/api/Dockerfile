@@ -35,6 +35,7 @@ COPY --chown=10001:10001 alembic ./alembic
 COPY --chown=10001:10001 alembic.ini ./alembic.ini
 RUN printf 'editflow:x:10001:10001:EDITFLOW runtime:/nonexistent:/usr/sbin/nologin\n' >> /etc/passwd && \
     printf 'editflow:x:10001:\n' >> /etc/group
+RUN mkdir -p /var/lib/editflow && chown 10001:10001 /var/lib/editflow
 
 # Only the isolated render worker receives FFmpeg/FFprobe.
 FROM runtime-base AS worker
