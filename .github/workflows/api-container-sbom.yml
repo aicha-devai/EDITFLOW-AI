@@ -18,6 +18,9 @@ jobs:
       - name: Build the API image from its production Dockerfile
         run: docker build --pull -t editflow-api:sbom ./apps/api
 
+      - name: Prepare SBOM output directory
+        run: mkdir -p sbom
+
       - name: Generate CycloneDX SBOM for the built API image
         uses: anchore/sbom-action@v0
         with:
