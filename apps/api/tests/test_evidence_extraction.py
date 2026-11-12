@@ -54,3 +54,65 @@ def test_critic_receives_timestamped_extracted_keyframes_and_transcript():
     assert len(evidence["keyframes"]) == 1
     assert evidence["keyframes"][0]["object_key"] == "frames/b.jpg"
     assert evidence["transcript_segments"][0]["text"] == "Look at this."
+
+
+@pytest.mark.asyncio
+async def test_scene_detection_failure_falls_back_to_ffmpeg(monkeypatch):
+    import app.evidence_extraction as extraction
+
+    class FailedDetector:
+        returncode = 1
+
+        async def communicate(self):
+            return b"", b"PySceneDetect failed"
+
+    async def fake_create_subprocess_exec(*args, **kwargs):
+        return FailedDetector()
+
+    async def fake_fallback(video_path, threshold, timeout_seconds):
+        assert video_path == "broken-codec.mp4"
+        assert threshold == 0.3
+        assert timeout_seconds == 7
+        return [1.25]
+
+    monkeypatch.setattr(extraction.asyncio, "create_subprocess_exec", fake_create_subprocess_exec)
+    monkeypatch.setattr(extraction, "_ffmpeg_scene_change_timestamps", fake_fallback)
+
+    result = await extraction._scene_change_timestamps("broken-codec.mp4", 0.3, 7)
+    assert result == [1.25]
+
+
+@pytest.mark.asyncio
+async def test_scene_detection_timeout_kills_subprocess_and_falls_back(monkeypatch):
+    import app.evidence_extraction as extraction
+
+    class SlowDetector:
+        returncode = None
+        killed = False
+        calls = 0
+
+        async def communicate(self):
+            self.calls += 1
+            if self.calls == 1:
+                await asyncio.sleep(1)
+                return b"", b""
+            return b"", b""
+
+        def kill(self):
+            self.killed = True
+            self.returncode = -9
+
+    process = SlowDetector()
+
+    async def fake_create_subprocess_exec(*args, **kwargs):
+        return process
+
+    async def fake_fallback(video_path, threshold, timeout_seconds):
+        return [2.0]
+
+    monkeypatch.setattr(extraction.asyncio, "create_subprocess_exec", fake_create_subprocess_exec)
+    monkeypatch.setattr(extraction, "_ffmpeg_scene_change_timestamps", fake_fallback)
+
+    result = await extraction._scene_change_timestamps("slow.mp4", 0.3, 0)
+    assert result == [2.0]
+    assert process.killed is True
