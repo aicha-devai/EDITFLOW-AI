@@ -2,6 +2,8 @@ FROM python:3.12.16-slim-trixie@sha256:4840d514c583a4d3d8cad3940e68dee6f0f6f3635
 
 # Freeze the Debian package universe used by this image. Bump this timestamp
 # deliberately when refreshing OS packages and reviewing the resulting SBOM.
+# Upgrade inherited packages from the same snapshot so security fixes are not
+# left behind in the pinned Python base image.
 ARG DEBIAN_SNAPSHOT=20261112T000000Z
 RUN set -eux; \
     rm -f /etc/apt/sources.list /etc/apt/sources.list.d/*; \
@@ -21,7 +23,6 @@ RUN set -eux; \
       "Check-Valid-Until: no" \
       > /etc/apt/sources.list.d/debian.sources; \
     apt-get update; \
-    # Bring inherited base-image packages up to the frozen security snapshot. \
     apt-get upgrade -y --no-install-recommends; \
     apt-get install -y --no-install-recommends ffmpeg=7:7.1.5-0+deb13u1; \
     test "$(dpkg-query -W -f='${Version}' ffmpeg)" = "7:7.1.5-0+deb13u1"; \
