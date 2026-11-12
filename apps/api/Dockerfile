@@ -38,6 +38,8 @@ RUN printf 'editflow:x:10001:10001:EDITFLOW runtime:/nonexistent:/usr/sbin/nolog
 
 # Only the isolated render worker receives FFmpeg/FFprobe.
 FROM runtime-base AS worker
+COPY requirements-worker.txt .
+RUN pip install --no-cache-dir -r requirements-worker.txt
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends ffmpeg=7:7.1.5-0+deb13u1; \
