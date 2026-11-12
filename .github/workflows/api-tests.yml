@@ -124,13 +124,14 @@ jobs:
           output-file: sbom/editflow-web-build.cdx.json
           upload-artifact: false
 
-      - name: Capture exact npm dependency tree and build tool versions
+      - name: Capture exact npm dependency tree, generated lockfile, and build tool versions
         run: |
-          docker run --rm --entrypoint sh editflow-web-build:sbom -c 'set -eu
+          docker run --rm -v "$PWD/sbom:/out" --entrypoint sh editflow-web-build:sbom -c 'set -eu
+            cp /app/package-lock.json /out/web-package-lock.generated.json
             node --version
             npm --version
-            npm ls --all --json || true
-          ' > sbom/web-build-dependencies.json
+            npm ls --all --json > /out/web-build-dependencies.json || true
+          '
 
       - name: Build the web production runtime image
         run: docker build --pull -t editflow-web:sbom ./apps/web
