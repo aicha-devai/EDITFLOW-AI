@@ -190,7 +190,7 @@ jobs:
         run: docker build --pull -t editflow-web:sbom ./apps/web
 
       - name: Verify web runtime is non-root and Nginx configuration is valid
-        run: docker run --rm --entrypoint sh editflow-web:sbom -c 'set -eu; test "$(id -u)" = "101"; nginx -t'
+        run: docker run --rm --add-host editflow-api.railway.internal:127.0.0.1 --entrypoint sh editflow-web:sbom -c 'set -eu; test "$(id -u)" = "101"; nginx -t'
 
       - name: Validate public Nginx proxy configuration
         run: |
