@@ -7,7 +7,7 @@ This file records third-party software intentionally used by EDITFLOW AI or revi
 ### PySceneDetect
 
 - Upstream: https://github.com/Breakthrough/PySceneDetect
-- Package: `scenedetect[opencv]`
+- Package: `scenedetect-headless`
 - Version constraint: `>=0.7.3,<1`
 - License: BSD 3-Clause
 - Copyright: Copyright (C) 2014, Brandon Castellano
