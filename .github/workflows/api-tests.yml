@@ -146,7 +146,7 @@ jobs:
       - name: Capture Nginx and Alpine runtime package versions
         run: |
           docker run --rm --entrypoint sh editflow-web:sbom -c 'set -eu
-            nginx -v
+            nginx -v 2>&1
             cat /etc/alpine-release
             apk info -vv | sort
           ' > sbom/web-runtime-and-os-packages.txt
@@ -154,7 +154,7 @@ jobs:
       - name: Preserve Alpine package license files
         run: |
           docker run --rm -v "$PWD/sbom:/out" --entrypoint sh editflow-web:sbom -c 'set -eu
-            find /usr/share -type f \( -iname "license*" -o -iname "copyright*" -o -iname "copying*" \) -print0 | tar --null -czf /out/alpine-license-files.tar.gz --files-from -
+            find /usr/share -type f \( -iname "license*" -o -iname "copyright*" -o -iname "copying*" \) -print | tar -czf /out/alpine-license-files.tar.gz -T -
           '
 
       - name: Create API license metadata inventory
