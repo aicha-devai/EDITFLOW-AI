@@ -106,7 +106,7 @@ jobs:
 
       - name: Verify media worker is unprivileged and has pinned FFmpeg tools
         run: |
-          docker run --rm --entrypoint sh editflow-worker:sbom -c 'set -eu; test "$(id -u)" = "10001"; python -c 'import cv2, scenedetect'; test "$(dpkg-query -W -f="\${Version}" ffmpeg)" = "7:7.1.5-0+deb13u1"; ffmpeg -version; ffprobe -version'
+          docker run --rm --entrypoint sh editflow-worker:sbom -c 'set -eu; test "$(id -u)" = "10001"; python -c "import cv2, scenedetect"; test "$(dpkg-query -W -f="\${Version}" ffmpeg)" = "7:7.1.5-0+deb13u1"; ffmpeg -version; ffprobe -version'
 
       - name: Prepare SBOM output directory
         run: mkdir -p sbom
