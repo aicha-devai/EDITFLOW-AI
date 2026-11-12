@@ -1,0 +1,53 @@
+name: API container SBOM
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  container-sbom:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the API image from its production Dockerfile
+        run: docker build --pull -t editflow-api:sbom ./apps/api
+
+      - name: Generate CycloneDX SBOM for the built API image
+        uses: anchore/sbom-action@v0
+        with:
+          image: editflow-api:sbom
+          format: cyclonedx-json
+          output-file: sbom/editflow-api.cdx.json
+          upload-artifact: false
+
+      - name: Capture FFmpeg build configuration and OS package versions
+        run: |
+          mkdir -p sbom
+          docker run --rm --entrypoint sh editflow-api:sbom -c '
+            set -eu
+            echo "=== FFmpeg version ==="
+            ffmpeg -version
+            echo "=== FFmpeg build configuration ==="
+            ffmpeg -buildconf
+            echo "=== FFprobe version ==="
+            ffprobe -version
+            echo "=== Installed Debian packages ==="
+            dpkg-query -W -f="${binary:Package}\t${Version}\n" | sort
+          ' > sbom/container-runtime-and-licenses.txt
+
+      - name: Create a license metadata review inventory
+        run: python tools/sbom_license_inventory.py sbom/editflow-api.cdx.json sbom/license-inventory.csv
+
+      - name: Upload SBOM and review artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: editflow-api-sbom-${{ github.sha }}
+          path: sbom/
+          if-no-files-found: error
+          retention-days: 30
