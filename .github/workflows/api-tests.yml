@@ -106,7 +106,7 @@ jobs:
 
       - name: Verify media worker is unprivileged and has pinned FFmpeg tools
         run: |
-          docker run --rm --entrypoint sh editflow-worker:sbom -c 'set -eu; test "$(id -u)" = "10001"; python -c "import cv2, scenedetect"; test "$(dpkg-query -W -f="\${Version}" ffmpeg)" = "7:7.1.5-0+deb13u1"; ffmpeg -version; ffprobe -version'
+          docker run --rm --entrypoint sh editflow-worker:sbom -c 'set -eu; test "$(id -u)" = "10001"; python -c "import cv2, scenedetect"; test "$(dpkg-query -W -f="${Version}" ffmpeg)" = "7:7.1.5-0+deb13u1"; ffmpeg -version; ffprobe -version'
 
       - name: Prepare SBOM output directory
         run: mkdir -p sbom
@@ -139,7 +139,7 @@ jobs:
       - name: Capture FFmpeg build configuration and OS package versions
         run: |
           docker run --rm --entrypoint sh editflow-worker:sbom -c 'set -eu
-            test "$(dpkg-query -W -f="\${Version}" ffmpeg)" = "7:7.1.5-0+deb13u1"
+            test "$(dpkg-query -W -f="${Version}" ffmpeg)" = "7:7.1.5-0+deb13u1"
             echo "=== FFmpeg Debian package version pin: verified ==="
             echo "=== Python version ==="
             python --version
@@ -190,7 +190,8 @@ jobs:
         run: docker build --pull -t editflow-web:sbom ./apps/web
 
       - name: Verify web runtime is non-root and Nginx configuration is valid
-        run: docker run --rm --add-host editflow-api.railway.internal:127.0.0.1 --entrypoint sh editflow-web:sbom -c 'set -eu; test "$(id -u)" = "101"; nginx -t -g "pid /tmp/nginx/nginx.pid;"'
+        run: |
+          docker run --rm --add-host editflow-api.railway.internal:127.0.0.1 --entrypoint sh editflow-web:sbom -c 'set -eu; test "$(id -u)" = "101"; nginx -t'
 
       - name: Validate public Nginx proxy configuration
         run: |
