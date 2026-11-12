@@ -91,7 +91,7 @@ async def _scene_change_timestamps(video_path: str, threshold: float, timeout_se
             process.kill()
             await process.communicate()
         return await _ffmpeg_scene_change_timestamps(video_path, threshold, timeout_seconds)
-    except (OSError, ValueError, json.JSONDecodeError, SceneDetectionError):
+    except (OSError, ValueError, json.JSONDecodeError, asyncio.TimeoutError, SceneDetectionError):
         if process is not None and process.returncode is None:
             process.kill()
             await process.communicate()
