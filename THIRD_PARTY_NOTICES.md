@@ -102,7 +102,7 @@ The inventory below was manually reconciled against upstream license texts where
 
 ### Runtime separation and container hardening
 
-- The Dockerfile now has separate `api` and `worker` targets. The API target intentionally excludes the FFmpeg/FFprobe executables; only the isolated worker target installs them.
+- The Dockerfile now has separate `api` and `worker` targets. The API target excludes the FFmpeg/FFprobe executables and PySceneDetect/OpenCV dependencies; only the isolated worker target installs `requirements-worker.txt` and the media toolchain.
 - Both Python runtime targets run as UID/GID 10001, not root.
 - The production Compose topology sets read-only root filesystems, drops Linux capabilities, enables `no-new-privileges`, uses bounded writable tmpfs mounts, and applies PID/CPU/memory limits.
 - The worker receives only database, object-storage, and optional evidence-extraction credentials; SMTP credentials and the API authentication secret are not inherited by the worker.
