@@ -7,7 +7,7 @@ RUN set -eux; \
     rm -f /etc/apt/sources.list /etc/apt/sources.list.d/*; \
     printf '%s\n' \
       "Types: deb" \
-      "URIs: https://snapshot.debian.org/archive/debian/\${DEBIAN_SNAPSHOT}" \
+      "URIs: https://snapshot.debian.org/archive/debian/${DEBIAN_SNAPSHOT}" \
       "Suites: trixie trixie-updates" \
       "Components: main" \
       "Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg" \
@@ -41,7 +41,7 @@ FROM runtime-base AS worker
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends ffmpeg=7:7.1.5-0+deb13u1; \
-    test "$(dpkg-query -W -f='\${Version}' ffmpeg)" = "7:7.1.5-0+deb13u1"; \
+    test "$(dpkg-query -W -f='${Version}' ffmpeg)" = "7:7.1.5-0+deb13u1"; \
     rm -rf /var/lib/apt/lists/*
 USER 10001:10001
 CMD ["python", "-m", "app.worker_main"]
