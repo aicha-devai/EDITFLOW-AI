@@ -52,12 +52,12 @@ These repositories were inspected for architectural ideas only. EDITFLOW AI does
 ### OpenCV-Python headless (transitive dependency)
 
 - Upstream: https://github.com/opencv/opencv-python
-- Package observed in the API and worker SBOMs: `opencv-python-headless 5.0.0.93`
+- Package observed in the isolated worker SBOM: `opencv-python-headless 5.0.0.93`
 - OpenCV library license: Apache-2.0 (OpenCV 4.5.0 and later).
 - Wheel build scripts: MIT.
 - Bundled FFmpeg libraries: LGPL-2.1, as stated by the upstream wheel project.
-- Why present: transitive dependency of `scenedetect-headless`; the headless wheel is appropriate for a server/container without GUI requirements.
-- Important distinction: this wheel bundles its own FFmpeg shared libraries in addition to the separate Debian `ffmpeg` executable installed by the isolated worker Dockerfile. The bundled wheel libraries must be included in the API and worker release inventories separately from the worker's system FFmpeg package.
+- Why present: transitive dependency of `scenedetect-headless`, installed only through `apps/api/requirements-worker.txt`; the headless wheel is appropriate for a server/container without GUI requirements.
+- Important distinction: this wheel bundles its own FFmpeg shared libraries in addition to the separate Debian `ffmpeg` executable installed by the isolated worker Dockerfile. The bundled wheel libraries must be included in the worker release inventory separately from the worker's system FFmpeg package.
 
 ### FFmpeg in the isolated worker container (observed build snapshot)
 
