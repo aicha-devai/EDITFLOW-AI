@@ -66,7 +66,7 @@ These repositories were inspected for architectural ideas only. EDITFLOW AI does
 - Observed configure flags include `--enable-gpl`, `--enable-libx264`, `--enable-libx265`, and `--enable-libxvid`; `--enable-version3` was not present.
 - License consequence: this particular FFmpeg build is GPL-2.0-or-later, not an LGPL-only build. The FFmpeg project documents that enabling GPL components makes the resulting FFmpeg binaries/libraries GPL-covered. The exact Debian package copyright files and the SBOM must travel with any redistributed image.
 - The API invokes the standalone FFmpeg executable as a separate process; this fact alone does not mean EDITFLOW's Python application source is automatically relicensed. Redistribution of the FFmpeg executable/container still carries its own license and corresponding-source obligations.
-- Reproducibility caveat: the current Dockerfile uses a floating `python:3.12-slim` tag and installs an unpinned `ffmpeg` apt package. The recorded versions are a dated build snapshot, not a guarantee that future builds resolve to the same versions. Regenerate the SBOM and review the FFmpeg build configuration for every release image.
+- Reproducibility: the API Dockerfile now pins the Python base image by the digest observed in CI and installs the exact Debian FFmpeg package version `7:7.1.5-0+deb13u1`. The apt dependency closure is still resolved from the Debian repositories at build time; retain the generated SBOM and Debian copyright archive for every release build.
 - CI preserves the CycloneDX container SBOM, license metadata inventory, exact FFmpeg build configuration, Debian package version list, and a tarball of installed Debian package copyright files as workflow artifacts.
 
 ### Licensing evidence
@@ -77,9 +77,9 @@ These repositories were inspected for architectural ideas only. EDITFLOW AI does
 
 ## Web container and JavaScript dependency scope
 
-- The web Dockerfile has a Node build stage (`node:22-alpine`) and an Nginx runtime stage (`nginx:1.27-alpine`). CI now generates separate SBOMs for both images so build-time npm dependencies are not hidden by the multi-stage runtime image.
+- The web Dockerfile has a Node build stage (`node:22-alpine`) and an Nginx runtime stage (`nginx:1.27-alpine`); both base images are pinned by the exact digests observed in CI. CI generates separate SBOMs for both images so build-time npm dependencies are not hidden by the multi-stage runtime image.
 - The web package manifest currently has no committed `package-lock.json`; the Dockerfile runs `npm install`. The generated SBOM records the exact resolved dependency tree for that CI build, but future builds can resolve different versions within the semver ranges.
-- Both base image tags are floating. Pin the Node and Nginx images by digest and commit a reviewed npm lockfile before treating the web build as reproducible for a customer-distributed release.
+- The Node and Nginx base image digests are now pinned. The remaining web-build reproducibility gap is npm dependency resolution: commit and review a `package-lock.json`, then switch the Dockerfile and CI from `npm install` to `npm ci` before treating the web build as fully reproducible.
 
 ## Build-time and runtime licenses confirmed from the full-stack SBOM
 
