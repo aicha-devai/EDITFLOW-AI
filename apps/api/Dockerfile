@@ -7,22 +7,21 @@ FROM python:3.12.16-slim-trixie@sha256:4840d514c583a4d3d8cad3940e68dee6f0f6f3635
 ARG DEBIAN_SNAPSHOT=20261112T000000Z
 RUN set -eux; \
     rm -f /etc/apt/sources.list /etc/apt/sources.list.d/*; \
-    cat > /etc/apt/sources.list.d/debian.sources <<EOF
-Types: deb
-URIs: https://snapshot.debian.org/archive/debian/${DEBIAN_SNAPSHOT}
-Suites: trixie trixie-updates
-Components: main
-Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
-Check-Valid-Until: no
-
-Types: deb
-URIs: https://snapshot.debian.org/archive/debian-security/${DEBIAN_SNAPSHOT}
-Suites: trixie-security
-Components: main
-Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
-Check-Valid-Until: no
-EOF
-RUN set -eux; \
+    printf '%s\n' \
+      "Types: deb" \
+      "URIs: https://snapshot.debian.org/archive/debian/${DEBIAN_SNAPSHOT}" \
+      "Suites: trixie trixie-updates" \
+      "Components: main" \
+      "Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg" \
+      "Check-Valid-Until: no" \
+      "" \
+      "Types: deb" \
+      "URIs: https://snapshot.debian.org/archive/debian-security/${DEBIAN_SNAPSHOT}" \
+      "Suites: trixie-security" \
+      "Components: main" \
+      "Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg" \
+      "Check-Valid-Until: no" \
+      > /etc/apt/sources.list.d/debian.sources; \
     apt-get update; \
     apt-get upgrade -y --no-install-recommends; \
     apt-get install -y --no-install-recommends ffmpeg=7:7.1.5-0+deb13u1; \
