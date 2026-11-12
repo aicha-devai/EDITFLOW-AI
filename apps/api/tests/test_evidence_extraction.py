@@ -116,3 +116,43 @@ async def test_scene_detection_timeout_kills_subprocess_and_falls_back(monkeypat
     result = await extraction._scene_change_timestamps("slow.mp4", 0.3, 0)
     assert result == [2.0]
     assert process.killed is True
+
+@pytest.mark.asyncio
+async def test_scene_detection_cancellation_kills_subprocess_and_propagates(monkeypatch):
+    import app.evidence_extraction as extraction
+
+    class CancellableDetector:
+        returncode = None
+        killed = False
+        calls = 0
+
+        async def communicate(self):
+            self.calls += 1
+            if self.calls == 1:
+                await asyncio.Future()
+            return b"", b""
+
+        def kill(self):
+            self.killed = True
+            self.returncode = -9
+
+    process = CancellableDetector()
+
+    async def fake_create_subprocess_exec(*args, **kwargs):
+        return process
+
+    async def unexpected_fallback(*args, **kwargs):
+        raise AssertionError("Cancellation must not start FFmpeg fallback")
+
+    monkeypatch.setattr(extraction.asyncio, "create_subprocess_exec", fake_create_subprocess_exec)
+    monkeypatch.setattr(extraction, "_ffmpeg_scene_change_timestamps", unexpected_fallback)
+
+    task = asyncio.create_task(extraction._scene_change_timestamps("cancel.mp4", 0.3, 30))
+    await asyncio.sleep(0)
+    task.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    assert process.killed is True
+    assert process.calls == 2
