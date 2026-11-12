@@ -80,3 +80,31 @@ These repositories were inspected for architectural ideas only. EDITFLOW AI does
 - The web Dockerfile has a Node build stage (`node:22-alpine`) and an Nginx runtime stage (`nginx:1.27-alpine`). CI now generates separate SBOMs for both images so build-time npm dependencies are not hidden by the multi-stage runtime image.
 - The web package manifest currently has no committed `package-lock.json`; the Dockerfile runs `npm install`. The generated SBOM records the exact resolved dependency tree for that CI build, but future builds can resolve different versions within the semver ranges.
 - Both base image tags are floating. Pin the Node and Nginx images by digest and commit a reviewed npm lockfile before treating the web build as reproducible for a customer-distributed release.
+
+## Build-time and runtime licenses confirmed from the full-stack SBOM
+
+The inventory below was manually reconciled against upstream license texts where Syft did not return a license identifier. It remains a technical review record, not a legal opinion.
+
+### Node.js build image and bundled build tooling
+
+- Node.js `22.23.5`: MIT License. The official Node.js license file also enumerates externally maintained components with separate licenses; preserve the license bundle captured by CI rather than assuming the whole Node distribution is covered by one MIT notice.
+- esbuild `v0.0.0-20251101233416-208f539945b1`: MIT License (upstream `evanw/esbuild` `LICENSE`).
+- `golang.org/x/sys` `v0.0.0-20220715151400-c0bba94af5f8`: BSD-3-Clause.
+- `editflow-story-graph-explorer@0.1.0` is the first-party private application package (`private: true`), not a third-party dependency. It is excluded from third-party license-missing counts; this does not grant or assert an open-source license for EDITFLOW AI itself.
+
+### Reproducible container inputs pinned on the feature branch
+
+- API base: `python:3.12-slim@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b`.
+- Web build base: `node:22-alpine@sha256:1314fb30ec37592d5845e5a160d522c0e680972aa534549940b8d73bde88481a`.
+- Web runtime base: `nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10`.
+- API FFmpeg Debian package: `7:7.1.5-0+deb13u1` (version epoch included in the apt package pin).
+- These image digests are the exact inputs observed in the successful CI build and are pinned in the Dockerfiles. Update them only through a reviewed dependency refresh with a new SBOM.
+
+### API development-only dependencies
+
+- `pytest` and `pytest-asyncio` are in `apps/api/requirements-dev.txt`, which includes the production `requirements.txt`; they are no longer installed into the production API image.
+- CI installs the development requirements for test execution. The production Dockerfile installs only `apps/api/requirements.txt`.
+
+### Remaining reproducibility limitation
+
+- The web image still uses `npm install` with semver ranges and does not yet commit a lockfile. CI preserves the generated lockfile and exact dependency tree in its SBOM artifact, but the web build is not fully dependency-reproducible until a reviewed `package-lock.json` is committed and the Dockerfile switches to `npm ci`.
