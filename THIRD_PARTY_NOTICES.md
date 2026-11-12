@@ -61,12 +61,12 @@ These repositories were inspected for architectural ideas only. EDITFLOW AI does
 
 ### FFmpeg in the API container (observed build snapshot)
 
-- Container image source: `apps/api/Dockerfile` (`python:3.12-slim`, Debian 13 at the time of this SBOM run).
+- Container image source: `apps/api/Dockerfile` (Python 3.12.16 slim-trixie image pinned by immutable index digest; Debian 13 at the time of the refreshed build).
 - Observed executable: FFmpeg `7.1.5-0+deb13u1`; FFprobe `7.1.5-0+deb13u1`.
 - Observed configure flags include `--enable-gpl`, `--enable-libx264`, `--enable-libx265`, and `--enable-libxvid`; `--enable-version3` was not present.
 - License consequence: this particular FFmpeg build is GPL-2.0-or-later, not an LGPL-only build. The FFmpeg project documents that enabling GPL components makes the resulting FFmpeg binaries/libraries GPL-covered. The exact Debian package copyright files and the SBOM must travel with any redistributed image.
 - The API invokes the standalone FFmpeg executable as a separate process; this fact alone does not mean EDITFLOW's Python application source is automatically relicensed. Redistribution of the FFmpeg executable/container still carries its own license and corresponding-source obligations.
-- Reproducibility: the API Dockerfile now pins the Python base image by the digest observed in CI and installs the exact Debian FFmpeg package version `7:7.1.5-0+deb13u1`. The apt dependency closure is still resolved from the Debian repositories at build time; retain the generated SBOM and Debian copyright archive for every release build.
+- Reproducibility: the API Dockerfile pins the Python 3.12.16 slim-trixie base by immutable image-index digest and installs the exact Debian FFmpeg package version `7:7.1.5-0+deb13u1` from a dated Debian Snapshot. The next CI run must verify the refreshed base + snapshot combination and preserve the resulting SBOM and Debian copyright archive.
 - CI preserves the CycloneDX container SBOM, license metadata inventory, exact FFmpeg build configuration, Debian package version list, and a tarball of installed Debian package copyright files as workflow artifacts.
 
 ### Licensing evidence
@@ -77,9 +77,9 @@ These repositories were inspected for architectural ideas only. EDITFLOW AI does
 
 ## Web container and JavaScript dependency scope
 
-- The web Dockerfile has a Node build stage (`node:22-alpine`) and an Nginx runtime stage (`nginx:1.27-alpine`); both base images are pinned by the exact digests observed in CI. CI generates separate SBOMs for both images so build-time npm dependencies are not hidden by the multi-stage runtime image.
-- The web package manifest currently has no committed `package-lock.json`; the Dockerfile runs `npm install`. The generated SBOM records the exact resolved dependency tree for that CI build, but future builds can resolve different versions within the semver ranges.
-- The Node and Nginx base image digests are now pinned. The remaining web-build reproducibility gap is npm dependency resolution: commit and review a `package-lock.json`, then switch the Dockerfile and CI from `npm install` to `npm ci` before treating the web build as fully reproducible.
+- The web Dockerfile has a Node 22 Alpine build stage and an Nginx 1.30.6 Alpine 3.24 slim runtime stage; both base images are pinned by immutable image-index digests. CI generates separate SBOMs for both images so build-time npm dependencies are not hidden by the multi-stage runtime image.
+- A reviewed `package-lock.json` is committed, and both the Dockerfile and CI use `npm ci` so npm dependency resolution is lockfile-driven.
+- The Node and Nginx base image digests are pinned. The committed lockfile plus `npm ci` closes the previous web npm resolution gap; the lockfile still needs routine dependency vulnerability and license review.
 
 ## Build-time and runtime licenses confirmed from the full-stack SBOM
 
@@ -94,11 +94,11 @@ The inventory below was manually reconciled against upstream license texts where
 
 ### Reproducible container inputs pinned on the feature branch
 
-- API base: `python:3.12-slim@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b`.
+- API base: `python:3.12.16-slim-trixie@sha256:4840d514c583a4d3d8cad3940e68dee6f0f6f3635c12fcd0a3d74c21a5b93a54` (index digest; refreshed on the feature branch).
 - Web build base: `node:22-alpine@sha256:1314fb30ec37592d5845e5a160d522c0e680972aa534549940b8d73bde88481a`.
-- Web runtime base: `nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10`.
+- Web runtime base: `nginx:1.30.6-alpine3.24-slim@sha256:f65ed258206d1eb6c4eb6141111715a2cf94ac0a4ec9675fc2da186f7aadb163` (index digest; refreshed on the feature branch).
 - API FFmpeg Debian package: `7:7.1.5-0+deb13u1` (version epoch included in the apt package pin).
-- These image digests are the exact inputs observed in the successful CI build and are pinned in the Dockerfiles. Update them only through a reviewed dependency refresh with a new SBOM.
+- The Node build base remains pinned to the digest recorded in the current CI artifact. The Python and Nginx digest updates are proposed changes and must be verified by the next successful CI build and regenerated SBOM before they are treated as proven build inputs.
 
 ### API development-only dependencies
 
@@ -107,4 +107,11 @@ The inventory below was manually reconciled against upstream license texts where
 
 ### Remaining reproducibility limitation
 
-- The web image still uses `npm install` with semver ranges and does not yet commit a lockfile. CI preserves the generated lockfile and exact dependency tree in its SBOM artifact, but the web build is not fully dependency-reproducible until a reviewed `package-lock.json` is committed and the Dockerfile switches to `npm ci`.
+- Python production requirements still use semver-like version ranges (`>=` / `<`) without a committed hash-locked resolver file. The SBOM records one resolved build, but Python dependency resolution is not fully reproducible yet. Add a reviewed Python lock/constraints file with hashes and install it with a deterministic pip workflow before claiming end-to-end dependency reproducibility.
+
+
+### Container vulnerability scanning
+
+- CI now runs Trivy against both production images using a pinned Trivy Action commit and Trivy scanner version.
+- HIGH and CRITICAL findings (including unfixed findings) fail the container security gate; the JSON reports are uploaded for review even when the gate fails.
+- A green security gate is not established until the updated image build and scan job complete successfully. Do not suppress findings without a documented rationale, scope assessment, and time-bounded exception.
