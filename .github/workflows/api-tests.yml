@@ -168,6 +168,36 @@ jobs:
           output-file: sbom/editflow-web-runtime.cdx.json
           upload-artifact: false
 
+      - name: Scan API production image with Trivy
+        id: trivy_api
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: editflow-api:sbom
+          version: v0.76.2
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          ignore-unfixed: false
+          exit-code: '1'
+          format: json
+          output: sbom/trivy-api-vulnerabilities.json
+
+      - name: Scan web production image with Trivy
+        id: trivy_web
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: editflow-web:sbom
+          version: v0.76.2
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          ignore-unfixed: false
+          exit-code: '1'
+          format: json
+          output: sbom/trivy-web-vulnerabilities.json
+
       - name: Capture Nginx and Alpine runtime package versions
         run: |
           docker run --rm --entrypoint sh editflow-web:sbom -c 'set -eu
@@ -191,10 +221,22 @@ jobs:
       - name: Create web runtime license metadata inventory
         run: python tools/sbom_license_inventory.py sbom/editflow-web-runtime.cdx.json sbom/web-runtime-license-inventory.csv
 
-      - name: Upload SBOM and review artifacts
+      - name: Upload SBOM and security scan artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: editflow-full-stack-sbom-${{ github.sha }}
           path: sbom/
           if-no-files-found: error
           retention-days: 30
+      - name: Enforce container vulnerability gate
+        if: always()
+        env:
+          API_SCAN_OUTCOME: ${{ steps.trivy_api.outcome }}
+          WEB_SCAN_OUTCOME: ${{ steps.trivy_web.outcome }}
+        run: |
+          set -eu
+          if [ "$API_SCAN_OUTCOME" != "success" ] || [ "$WEB_SCAN_OUTCOME" != "success" ]; then
+            echo "::error::Trivy found HIGH/CRITICAL vulnerabilities or a scan failed. Inspect the uploaded JSON reports before approving this PR."
+            exit 1
+          fi
