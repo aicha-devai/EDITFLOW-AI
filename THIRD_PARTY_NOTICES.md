@@ -67,6 +67,7 @@ These repositories were inspected for architectural ideas only. EDITFLOW AI does
 - License consequence: this particular FFmpeg build is GPL-2.0-or-later, not an LGPL-only build. The FFmpeg project documents that enabling GPL components makes the resulting FFmpeg binaries/libraries GPL-covered. The exact Debian package copyright files and the SBOM must travel with any redistributed image.
 - The API invokes the standalone FFmpeg executable as a separate process; this fact alone does not mean EDITFLOW's Python application source is automatically relicensed. Redistribution of the FFmpeg executable/container still carries its own license and corresponding-source obligations.
 - Reproducibility caveat: the current Dockerfile uses a floating `python:3.12-slim` tag and installs an unpinned `ffmpeg` apt package. The recorded versions are a dated build snapshot, not a guarantee that future builds resolve to the same versions. Regenerate the SBOM and review the FFmpeg build configuration for every release image.
+- CI preserves the CycloneDX container SBOM, license metadata inventory, exact FFmpeg build configuration, Debian package version list, and a tarball of installed Debian package copyright files as workflow artifacts.
 
 ### Licensing evidence
 
