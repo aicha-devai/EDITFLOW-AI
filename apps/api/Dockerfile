@@ -36,13 +36,6 @@ COPY --chown=10001:10001 alembic.ini ./alembic.ini
 RUN groupadd --gid 10001 editflow && \
     useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin editflow
 
-# The public API does not need the FFmpeg command-line tools. Keep the media
-# parser/encoder toolchain out of this internet-facing runtime image.
-FROM runtime-base AS api
-USER 10001:10001
-EXPOSE 8000
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
-
 # Only the isolated render worker receives FFmpeg/FFprobe. It runs as the same
 # unprivileged UID and is additionally sandboxed by the production Compose file.
 FROM runtime-base AS worker
@@ -53,3 +46,11 @@ RUN set -eux; \
     rm -rf /var/lib/apt/lists/*
 USER 10001:10001
 CMD ["python", "-m", "app.worker_main"]
+
+# The public API does not need the FFmpeg command-line tools. Keep the media
+# parser/encoder toolchain out of this internet-facing runtime image.
+FROM runtime-base AS api
+USER 10001:10001
+EXPOSE 8000
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+
