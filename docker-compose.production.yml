@@ -27,6 +27,9 @@ services:
       S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
     expose:
       - "8000"
+    networks:
+      - frontend
+      - data
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=256m,uid=10001,gid=10001,mode=1770
@@ -51,6 +54,8 @@ services:
       context: ./apps/api
       target: worker
     command: ["python", "-m", "app.worker_main"]
+    networks:
+      - data
     environment:
       EDITFLOW_ENV: production
       DATABASE_URL: ${DATABASE_URL:?Set managed PostgreSQL URL with TLS}
@@ -92,6 +97,8 @@ services:
     image: editflow-web:production
     expose:
       - "8080"
+    networks:
+      - frontend
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=32m,uid=101,gid=101,mode=1770
@@ -112,6 +119,8 @@ services:
         condition: service_healthy
       web:
         condition: service_started
+    networks:
+      - frontend
     ports:
       - "80:80"
       - "443:443"
@@ -123,6 +132,7 @@ services:
       - /tmp:rw,noexec,nosuid,size=32m
       - /var/cache/nginx:rw,noexec,nosuid,size=64m
       - /run:rw,noexec,nosuid,size=16m
+      - /var/log/nginx:rw,noexec,nosuid,size=32m
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -132,3 +142,9 @@ services:
     init: true
     pids_limit: 128
     restart: unless-stopped
+
+networks:
+  frontend:
+    driver: bridge
+  data:
+    driver: bridge
