@@ -86,12 +86,23 @@ async def _scene_change_timestamps(video_path: str, threshold: float, timeout_se
         if not isinstance(values, list):
             raise SceneDetectionError("PySceneDetect returned an invalid result")
         return [float(value) for value in values]
+    except asyncio.CancelledError:
+        if process is not None and process.returncode is None:
+            try:
+                process.kill()
+            except ProcessLookupError:
+                pass
+            await process.communicate()
+        raise
     except asyncio.TimeoutError:
         if process is not None and process.returncode is None:
-            process.kill()
+            try:
+                process.kill()
+            except ProcessLookupError:
+                pass
             await process.communicate()
         return await _ffmpeg_scene_change_timestamps(video_path, threshold, timeout_seconds)
-    except (OSError, ValueError, json.JSONDecodeError, asyncio.TimeoutError, SceneDetectionError):
+    except (OSError, ValueError, json.JSONDecodeError, SceneDetectionError):
         if process is not None and process.returncode is None:
             process.kill()
             await process.communicate()
