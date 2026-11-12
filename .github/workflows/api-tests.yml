@@ -142,7 +142,7 @@ jobs:
 
       - name: Preserve Debian package copyright and license files
         run: |
-          docker run --rm -v "$PWD/sbom:/out" --entrypoint sh editflow-api:sbom -c 'set -eu
+          docker run --rm -v "$PWD/sbom:/out" --entrypoint sh editflow-worker:sbom -c 'set -eu
             find /usr/share/doc -type f -name copyright -print0 | tar --null -czf /out/debian-copyright-files.tar.gz --files-from -
           '
 
@@ -226,7 +226,7 @@ jobs:
           image-ref: editflow-web:sbom
           version: v0.76.2
           vuln-type: os,library
-          severity: HIGH,CRITICAL
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
           ignore-unfixed: false
           exit-code: '1'
           format: json
