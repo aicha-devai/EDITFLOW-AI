@@ -87,9 +87,9 @@ The inventory below was manually reconciled against upstream license texts where
 
 ### Node.js build image and bundled build tooling
 
-- Node.js `22.23.5`: MIT License. The official Node.js license file also enumerates externally maintained components with separate licenses; preserve the license bundle captured by CI rather than assuming the whole Node distribution is covered by one MIT notice.
-- esbuild `v0.0.0-20251101233416-208f539945b1`: MIT License (upstream `evanw/esbuild` `LICENSE`).
-- `golang.org/x/sys` `v0.0.0-20220715151400-c0bba94af5f8`: BSD-3-Clause.
+- Node.js `22.23.5`: MIT License ([upstream LICENSE](https://github.com/nodejs/node/blob/main/LICENSE)). The official Node.js license file also enumerates externally maintained components with separate licenses; preserve the license bundle captured by CI rather than assuming the whole Node distribution is covered by one MIT notice.
+- esbuild `v0.0.0-20251101233416-208f539945b1`: MIT License ([upstream LICENSE](https://github.com/evanw/esbuild/blob/master/LICENSE)).
+- `golang.org/x/sys` `v0.0.0-20220715151400-c0bba94af5f8`: BSD-3-Clause ([upstream license metadata](https://pkg.go.dev/golang.org/x/sys)).
 - `editflow-story-graph-explorer@0.1.0` is the first-party private application package (`private: true`), not a third-party dependency. It is excluded from third-party license-missing counts; this does not grant or assert an open-source license for EDITFLOW AI itself.
 
 ### Reproducible container inputs pinned on the feature branch
