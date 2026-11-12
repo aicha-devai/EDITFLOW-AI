@@ -7,14 +7,14 @@ RUN set -eux; \
     rm -f /etc/apt/sources.list /etc/apt/sources.list.d/*; \
     printf '%s\n' \
       "Types: deb" \
-      "URIs: https://snapshot.debian.org/archive/debian/${DEBIAN_SNAPSHOT}" \
+      "URIs: https://snapshot.debian.org/archive/debian/\${DEBIAN_SNAPSHOT}" \
       "Suites: trixie trixie-updates" \
       "Components: main" \
       "Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg" \
       "Check-Valid-Until: no" \
       "" \
       "Types: deb" \
-      "URIs: https://snapshot.debian.org/archive/debian-security/${DEBIAN_SNAPSHOT}" \
+      "URIs: https://snapshot.debian.org/archive/debian-security/\${DEBIAN_SNAPSHOT}" \
       "Suites: trixie-security" \
       "Components: main" \
       "Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg" \
@@ -33,24 +33,22 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY --chown=10001:10001 app ./app
 COPY --chown=10001:10001 alembic ./alembic
 COPY --chown=10001:10001 alembic.ini ./alembic.ini
-RUN printf 'editflow:x:10001:10001:EDITFLOW runtime:/nonexistent:/usr/sbin/nologin\\n' >> /etc/passwd && \\
-    printf 'editflow:x:10001:\\n' >> /etc/group
+RUN printf 'editflow:x:10001:10001:EDITFLOW runtime:/nonexistent:/usr/sbin/nologin\n' >> /etc/passwd && \
+    printf 'editflow:x:10001:\n' >> /etc/group
 
-# Only the isolated render worker receives FFmpeg/FFprobe. It runs as the same
-# unprivileged UID and is additionally sandboxed by the production Compose file.
+# Only the isolated render worker receives FFmpeg/FFprobe.
 FROM runtime-base AS worker
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends ffmpeg=7:7.1.5-0+deb13u1; \
-    test "$(dpkg-query -W -f='${Version}' ffmpeg)" = "7:7.1.5-0+deb13u1"; \
+    test "$(dpkg-query -W -f='\${Version}' ffmpeg)" = "7:7.1.5-0+deb13u1"; \
     rm -rf /var/lib/apt/lists/*
 USER 10001:10001
 CMD ["python", "-m", "app.worker_main"]
 
-# The public API does not need the FFmpeg command-line tools. Keep the media
-# parser/encoder toolchain out of this internet-facing runtime image.
+# Keep the public API as the default Docker build target. It does not contain
+# the FFmpeg/FFprobe command-line tools used only by the isolated worker.
 FROM runtime-base AS api
 USER 10001:10001
 EXPOSE 8000
 CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
-
