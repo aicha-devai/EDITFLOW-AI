@@ -10,7 +10,6 @@ COPY --chown=101:101 --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 RUN set -eux; \
     sed -i 's|/var/log/nginx/error.log|/dev/stderr|g; s|/var/log/nginx/access.log|/dev/stdout|g' /etc/nginx/nginx.conf; \
- \
     mkdir -p /tmp/nginx/client_temp /tmp/nginx/proxy_temp /tmp/nginx/fastcgi_temp /tmp/nginx/uwsgi_temp /tmp/nginx/scgi_temp; \
     chown -R 101:101 /tmp/nginx /var/cache/nginx /var/run /usr/share/nginx/html
 USER 101:101
