@@ -110,7 +110,7 @@ jobs:
       - name: Capture FFmpeg build configuration and OS package versions
         run: |
           docker run --rm --entrypoint sh editflow-api:sbom -c 'set -eu
-            test "$(dpkg-query -W -f="${Version}" ffmpeg)" = "7:7.1.5-0+deb13u1"
+            test "$(dpkg-query -W -f="\${Version}" ffmpeg)" = "7:7.1.5-0+deb13u1"
             echo "=== FFmpeg Debian package version pin: verified ==="
             echo "=== Python version ==="
             python --version
