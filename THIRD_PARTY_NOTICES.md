@@ -52,21 +52,21 @@ These repositories were inspected for architectural ideas only. EDITFLOW AI does
 ### OpenCV-Python headless (transitive dependency)
 
 - Upstream: https://github.com/opencv/opencv-python
-- Package observed in the API container SBOM: `opencv-python-headless 5.0.0.93`
+- Package observed in the API and worker SBOMs: `opencv-python-headless 5.0.0.93`
 - OpenCV library license: Apache-2.0 (OpenCV 4.5.0 and later).
 - Wheel build scripts: MIT.
 - Bundled FFmpeg libraries: LGPL-2.1, as stated by the upstream wheel project.
 - Why present: transitive dependency of `scenedetect-headless`; the headless wheel is appropriate for a server/container without GUI requirements.
-- Important distinction: this wheel bundles its own FFmpeg shared libraries in addition to the separate Debian `ffmpeg` executable installed by the API Dockerfile. Both must be included in the release inventory.
+- Important distinction: this wheel bundles its own FFmpeg shared libraries in addition to the separate Debian `ffmpeg` executable installed by the isolated worker Dockerfile. The bundled wheel libraries must be included in the API and worker release inventories separately from the worker's system FFmpeg package.
 
-### FFmpeg in the API container (observed build snapshot)
+### FFmpeg in the isolated worker container (observed build snapshot)
 
 - Container image source: `apps/api/Dockerfile` (Python 3.12.16 slim-trixie image pinned by immutable index digest; Debian 13 at the time of the refreshed build).
 - Observed executable: FFmpeg `7.1.5-0+deb13u1`; FFprobe `7.1.5-0+deb13u1`.
 - Observed configure flags include `--enable-gpl`, `--enable-libx264`, `--enable-libx265`, and `--enable-libxvid`; `--enable-version3` was not present.
 - License consequence: this particular FFmpeg build is GPL-2.0-or-later, not an LGPL-only build. The FFmpeg project documents that enabling GPL components makes the resulting FFmpeg binaries/libraries GPL-covered. The exact Debian package copyright files and the SBOM must travel with any redistributed image.
-- The API invokes the standalone FFmpeg executable as a separate process; this fact alone does not mean EDITFLOW's Python application source is automatically relicensed. Redistribution of the FFmpeg executable/container still carries its own license and corresponding-source obligations.
-- Reproducibility: the API Dockerfile pins the Python 3.12.16 slim-trixie base by immutable image-index digest and installs the exact Debian FFmpeg package version `7:7.1.5-0+deb13u1` from a dated Debian Snapshot. The next CI run must verify the refreshed base + snapshot combination and preserve the resulting SBOM and Debian copyright archive.
+- The isolated render worker invokes the standalone FFmpeg executable as a separate process; this fact alone does not mean EDITFLOW's Python application source is automatically relicensed. Redistribution of the FFmpeg executable/container still carries its own license and corresponding-source obligations.
+- Reproducibility: the API and worker targets share the pinned Python 3.12.16 slim-trixie base by immutable image-index digest; only the worker target installs the exact Debian FFmpeg package version `7:7.1.5-0+deb13u1` from a dated Debian Snapshot. The next CI run must verify the refreshed base + snapshot combination and preserve the resulting SBOM and Debian copyright archive.
 - CI preserves the CycloneDX container SBOM, license metadata inventory, exact FFmpeg build configuration, Debian package version list, and a tarball of installed Debian package copyright files as workflow artifacts.
 
 ### Licensing evidence
@@ -77,7 +77,7 @@ These repositories were inspected for architectural ideas only. EDITFLOW AI does
 
 ## Web container and JavaScript dependency scope
 
-- The web Dockerfile has a Node 22 Alpine build stage and an Nginx 1.30.6 Alpine 3.24 slim runtime stage; both base images are pinned by immutable image-index digests. CI generates separate SBOMs for both images so build-time npm dependencies are not hidden by the multi-stage runtime image.
+- The web Dockerfile has a Node 22 Alpine build stage and an Nginx 1.30.6 Alpine 3.24 slim runtime stage; both base images are pinned by immutable image-index digests. The web Nginx process runs as UID 101 on unprivileged port 8080. CI generates separate SBOMs for both images so build-time npm dependencies are not hidden by the multi-stage runtime image.
 - A reviewed `package-lock.json` is committed, and both the Dockerfile and CI use `npm ci` so npm dependency resolution is lockfile-driven.
 - The Node and Nginx base image digests are pinned. The committed lockfile plus `npm ci` closes the previous web npm resolution gap; the lockfile still needs routine dependency vulnerability and license review.
 
@@ -97,8 +97,17 @@ The inventory below was manually reconciled against upstream license texts where
 - API base: `python:3.12.16-slim-trixie@sha256:4840d514c583a4d3d8cad3940e68dee6f0f6f3635c12fcd0a3d74c21a5b93a54` (index digest; refreshed on the feature branch).
 - Web build base: `node:22-alpine@sha256:1314fb30ec37592d5845e5a160d522c0e680972aa534549940b8d73bde88481a`.
 - Web runtime base: `nginx:1.30.6-alpine3.24-slim@sha256:f65ed258206d1eb6c4eb6141111715a2cf94ac0a4ec9675fc2da186f7aadb163` (index digest; refreshed on the feature branch).
-- API FFmpeg Debian package: `7:7.1.5-0+deb13u1` (version epoch included in the apt package pin).
+- Worker FFmpeg Debian package: `7:7.1.5-0+deb13u1` (version epoch included in the apt package pin).
 - The Node build base remains pinned to the digest recorded in the current CI artifact. The Python and Nginx digest updates are proposed changes and must be verified by the next successful CI build and regenerated SBOM before they are treated as proven build inputs.
+
+### Runtime separation and container hardening
+
+- The Dockerfile now has separate `api` and `worker` targets. The API target intentionally excludes the FFmpeg/FFprobe executables; only the isolated worker target installs them.
+- Both Python runtime targets run as UID/GID 10001, not root.
+- The production Compose topology sets read-only root filesystems, drops Linux capabilities, enables `no-new-privileges`, uses bounded writable tmpfs mounts, and applies PID/CPU/memory limits.
+- The worker receives only database, object-storage, and optional evidence-extraction credentials; SMTP credentials and the API authentication secret are not inherited by the worker.
+- The web Nginx runtime runs as UID 101 on port 8080. The public proxy is digest-pinned and has all capabilities dropped except `NET_BIND_SERVICE`.
+- These controls reduce privilege and blast radius; they do not remove vulnerabilities in FFmpeg or guarantee that the application cannot be compromised. The worker image remains blocked until its own scan is clean or the vulnerable media-processing dependency is replaced with a demonstrably safer design.
 
 ### API development-only dependencies
 
@@ -112,6 +121,6 @@ The inventory below was manually reconciled against upstream license texts where
 
 ### Container vulnerability scanning
 
-- CI now runs Trivy against both production images using a pinned Trivy Action commit and Trivy scanner version.
-- HIGH and CRITICAL findings (including unfixed findings) fail the container security gate; the JSON reports are uploaded for review even when the gate fails.
+- CI now runs Trivy against the API, isolated worker, and web production images using a pinned Trivy Action commit and Trivy scanner version. All severity levels are included, and any known finding fails the gate.
+- Any known finding at UNKNOWN, LOW, MEDIUM, HIGH, or CRITICAL severity (including unfixed findings) fails the container security gate; the JSON reports are uploaded for review even when the gate fails.
 - A green security gate is not established until the updated image build and scan job complete successfully. Do not suppress findings without a documented rationale, scope assessment, and time-bounded exception.
