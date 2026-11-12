@@ -94,7 +94,7 @@ async def test_scene_detection_timeout_kills_subprocess_and_falls_back(monkeypat
         async def communicate(self):
             self.calls += 1
             if self.calls == 1:
-                await asyncio.sleep(1)
+                await asyncio.sleep(3)
                 return b"", b""
             return b"", b""
 
