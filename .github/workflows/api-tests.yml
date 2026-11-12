@@ -107,6 +107,12 @@ jobs:
             dpkg-query -W | sort
           ' > sbom/container-runtime-and-licenses.txt
 
+      - name: Preserve Debian package copyright and license files
+        run: |
+          docker run --rm -v "$PWD/sbom:/out" --entrypoint sh editflow-api:sbom -c 'set -eu
+            find /usr/share/doc -type f -name copyright -print0 | tar --null -czf /out/debian-copyright-files.tar.gz --files-from -
+          '
+
       - name: Create a license metadata review inventory
         run: python tools/sbom_license_inventory.py sbom/editflow-api.cdx.json sbom/license-inventory.csv
 
