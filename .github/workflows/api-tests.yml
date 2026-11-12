@@ -113,13 +113,63 @@ jobs:
             find /usr/share/doc -type f -name copyright -print0 | tar --null -czf /out/debian-copyright-files.tar.gz --files-from -
           '
 
-      - name: Create a license metadata review inventory
-        run: python tools/sbom_license_inventory.py sbom/editflow-api.cdx.json sbom/license-inventory.csv
+      - name: Build the web production build stage
+        run: docker build --pull --target build -t editflow-web-build:sbom ./apps/web
+
+      - name: Generate CycloneDX SBOM for web build dependencies
+        uses: anchore/sbom-action@v0
+        with:
+          image: editflow-web-build:sbom
+          format: cyclonedx-json
+          output-file: sbom/editflow-web-build.cdx.json
+          upload-artifact: false
+
+      - name: Capture exact npm dependency tree and build tool versions
+        run: |
+          docker run --rm --entrypoint sh editflow-web-build:sbom -c 'set -eu
+            node --version
+            npm --version
+            npm ls --all --json || true
+          ' > sbom/web-build-dependencies.json
+
+      - name: Build the web production runtime image
+        run: docker build --pull -t editflow-web:sbom ./apps/web
+
+      - name: Generate CycloneDX SBOM for web runtime image
+        uses: anchore/sbom-action@v0
+        with:
+          image: editflow-web:sbom
+          format: cyclonedx-json
+          output-file: sbom/editflow-web-runtime.cdx.json
+          upload-artifact: false
+
+      - name: Capture Nginx and Alpine runtime package versions
+        run: |
+          docker run --rm --entrypoint sh editflow-web:sbom -c 'set -eu
+            nginx -v
+            cat /etc/alpine-release
+            apk info -vv | sort
+          ' > sbom/web-runtime-and-os-packages.txt
+
+      - name: Preserve Alpine package license files
+        run: |
+          docker run --rm -v "$PWD/sbom:/out" --entrypoint sh editflow-web:sbom -c 'set -eu
+            find /usr/share -type f \( -iname "license*" -o -iname "copyright*" -o -iname "copying*" \) -print0 | tar --null -czf /out/alpine-license-files.tar.gz --files-from -
+          '
+
+      - name: Create API license metadata inventory
+        run: python tools/sbom_license_inventory.py sbom/editflow-api.cdx.json sbom/api-license-inventory.csv
+
+      - name: Create web build license metadata inventory
+        run: python tools/sbom_license_inventory.py sbom/editflow-web-build.cdx.json sbom/web-build-license-inventory.csv
+
+      - name: Create web runtime license metadata inventory
+        run: python tools/sbom_license_inventory.py sbom/editflow-web-runtime.cdx.json sbom/web-runtime-license-inventory.csv
 
       - name: Upload SBOM and review artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: editflow-api-sbom-${{ github.sha }}
+          name: editflow-full-stack-sbom-${{ github.sha }}
           path: sbom/
           if-no-files-found: error
           retention-days: 30
