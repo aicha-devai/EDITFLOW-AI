@@ -173,7 +173,7 @@ jobs:
       - name: Preserve Node.js and npm license texts
         run: |
           docker run --rm --entrypoint sh editflow-web-build:sbom -c 'set -eu
-            find /usr/local -type f \( -iname "license*" -o -iname "copying*" \) -print0 | tar --null -czf - --files-from -
+            find /usr/local -type f \( -iname "license*" -o -iname "copying*" \) -print | tar -czf - -T -
           ' > sbom/node-license-files.tar.gz
 
       - name: Capture exact npm dependency tree, generated lockfile, and build tool versions
@@ -269,7 +269,7 @@ jobs:
       - name: Preserve Alpine package license files
         run: |
           docker run --rm --entrypoint sh editflow-web:sbom -c 'set -eu
-            find /usr/share -type f \( -iname "license*" -o -iname "copyright*" -o -iname "copying*" \) -print0 | tar --null -czf - --files-from -
+            find /usr/share -type f \( -iname "license*" -o -iname "copyright*" -o -iname "copying*" \) -print | tar -czf - -T -
           ' > sbom/alpine-license-files.tar.gz
 
       - name: Create API license metadata inventory
