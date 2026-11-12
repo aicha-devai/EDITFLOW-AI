@@ -155,9 +155,9 @@ jobs:
 
       - name: Preserve Debian package copyright and license files
         run: |
-          docker run --rm -v "$PWD/sbom:/out" --entrypoint sh editflow-worker:sbom -c 'set -eu
-            find /usr/share/doc -type f -name copyright -print0 | tar --null -czf /out/debian-copyright-files.tar.gz --files-from -
-          '
+          docker run --rm --entrypoint sh editflow-worker:sbom -c 'set -eu
+            find /usr/share/doc -type f -name copyright -print0 | tar --null -czf - --files-from -
+          ' > sbom/debian-copyright-files.tar.gz
 
       - name: Build the web production build stage
         run: docker build --pull --target build -t editflow-web-build:sbom ./apps/web
@@ -172,19 +172,19 @@ jobs:
 
       - name: Preserve Node.js and npm license texts
         run: |
-          docker run --rm -v "$PWD/sbom:/out" --entrypoint sh editflow-web-build:sbom -c 'set -eu
-            find /usr/local -type f \( -iname "license*" -o -iname "copying*" \) -print | tar -czf /out/node-license-files.tar.gz -T -
-          '
+          docker run --rm --entrypoint sh editflow-web-build:sbom -c 'set -eu
+            find /usr/local -type f \( -iname "license*" -o -iname "copying*" \) -print0 | tar --null -czf - --files-from -
+          ' > sbom/node-license-files.tar.gz
 
       - name: Capture exact npm dependency tree, generated lockfile, and build tool versions
         run: |
-          docker run --rm -v "$PWD/sbom:/out" --entrypoint sh editflow-web-build:sbom -c 'set -eu
-            cp /app/package-lock.json /out/web-package-lock.generated.json
+          docker run --rm --entrypoint sh editflow-web-build:sbom -c 'set -eu
             test "$(node --version)" = "v22.23.5"
             node --version
             npm --version
-            npm ls --all --json > /out/web-build-dependencies.json || true
-          '
+            cat /app/package-lock.json
+          ' > sbom/web-package-lock.generated.json
+          docker run --rm --entrypoint sh editflow-web-build:sbom -c 'npm ls --all --json || true' > sbom/web-build-dependencies.json
 
       - name: Build the web production runtime image
         run: docker build --pull -t editflow-web:sbom ./apps/web
@@ -268,9 +268,9 @@ jobs:
 
       - name: Preserve Alpine package license files
         run: |
-          docker run --rm -v "$PWD/sbom:/out" --entrypoint sh editflow-web:sbom -c 'set -eu
-            find /usr/share -type f \( -iname "license*" -o -iname "copyright*" -o -iname "copying*" \) -print | tar -czf /out/alpine-license-files.tar.gz -T -
-          '
+          docker run --rm --entrypoint sh editflow-web:sbom -c 'set -eu
+            find /usr/share -type f \( -iname "license*" -o -iname "copyright*" -o -iname "copying*" \) -print0 | tar --null -czf - --files-from -
+          ' > sbom/alpine-license-files.tar.gz
 
       - name: Create API license metadata inventory
         run: python tools/sbom_license_inventory.py sbom/editflow-api.cdx.json sbom/api-license-inventory.csv
