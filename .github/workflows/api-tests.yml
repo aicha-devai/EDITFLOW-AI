@@ -99,14 +99,14 @@ jobs:
       - name: Verify API image is unprivileged and excludes FFmpeg executables
         run: |
           docker run --rm --entrypoint sh editflow-api:sbom -c 'set -eu; test "$(id -u)" = "10001"; ! command -v ffmpeg >/dev/null 2>&1; ! command -v ffprobe >/dev/null 2>&1'
-          docker run --rm --entrypoint python editflow-api:sbom -c 'import importlib.util; assert importlib.util.find_spec("pytest") is None; assert importlib.util.find_spec("pytest_asyncio") is None'
+          docker run --rm --entrypoint python editflow-api:sbom -c 'import importlib.util; assert all(importlib.util.find_spec(name) is None for name in ("pytest", "pytest_asyncio", "cv2", "scenedetect"))'
 
       - name: Build isolated media worker image
         run: docker build --pull --target worker -t editflow-worker:sbom ./apps/api
 
       - name: Verify media worker is unprivileged and has pinned FFmpeg tools
         run: |
-          docker run --rm --entrypoint sh editflow-worker:sbom -c 'set -eu; test "$(id -u)" = "10001"; test "$(dpkg-query -W -f="\${Version}" ffmpeg)" = "7:7.1.5-0+deb13u1"; ffmpeg -version; ffprobe -version'
+          docker run --rm --entrypoint sh editflow-worker:sbom -c 'set -eu; test "$(id -u)" = "10001"; python -c 'import cv2, scenedetect'; test "$(dpkg-query -W -f="\${Version}" ffmpeg)" = "7:7.1.5-0+deb13u1"; ffmpeg -version; ffprobe -version'
 
       - name: Prepare SBOM output directory
         run: mkdir -p sbom
