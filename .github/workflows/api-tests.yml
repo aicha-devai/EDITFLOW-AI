@@ -80,6 +80,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Validate production Compose configuration
+        env:
+          DATABASE_URL: postgresql+asyncpg://editflow:ci-password@db.example:5432/editflow?ssl=require
+          EDITFLOW_AUTH_SECRET: ci-only-secret-value-with-at-least-32-characters
+          EDITFLOW_EMAIL_PUBLIC_URL: https://editflow.example
+          EDITFLOW_CORS_ORIGINS: https://editflow.example
+          EDITFLOW_EMAIL_SMTP_HOST: smtp.example
+          EDITFLOW_EMAIL_SMTP_USERNAME: ci-user
+          EDITFLOW_EMAIL_SMTP_PASSWORD: ci-password
+          EDITFLOW_EMAIL_FROM: noreply@editflow.example
+          S3_BUCKET: editflow-ci-bucket
+        run: docker compose -f docker-compose.production.yml config --quiet
+
       - name: Build the API image from its production Dockerfile
         run: docker build --pull --target api -t editflow-api:sbom ./apps/api
 
@@ -175,6 +188,9 @@ jobs:
 
       - name: Build the web production runtime image
         run: docker build --pull -t editflow-web:sbom ./apps/web
+
+      - name: Verify web runtime is non-root and Nginx configuration is valid
+        run: docker run --rm --entrypoint sh editflow-web:sbom -c 'set -eu; test "$(id -u)" = "101"; nginx -t'
 
       - name: Generate CycloneDX SBOM for web runtime image
         uses: anchore/sbom-action@v0
