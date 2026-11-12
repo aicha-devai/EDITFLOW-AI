@@ -1,63 +1,70 @@
 # Security and Open-Source License Review
 
 **Review date:** 2026-11-12  
-**Scope:** Production API image, web build image, web runtime image, and dependencies represented in CI run #477 SBOM.  
-**Status:** Preliminary engineering review; not legal advice and not a complete vulnerability attestation.
+**Scope:** API, isolated media worker, web runtime, production Compose topology, SBOMs, and dependency licensing.  
+**Status:** Active remediation. The pull request remains Draft; no production deployment or security attestation is approved.
 
 ## Executive findings
 
-1. The web production runtime image in the reviewed SBOM used Nginx 1.27.5 on Alpine 3.21.3. Alpine 3.21 reached end of support on 2026-11-01. This is a lifecycle/security maintenance blocker. The Dockerfile has now been updated to the pinned Nginx 1.30.6 / Alpine 3.24 image index digest `sha256:f65ed258206d1eb6c4eb6141111715a2cf94ac0a4ec9675fc2da186f7aadb163`; the next CI run must prove the resulting image and SBOM.
-2. The API Dockerfile has been updated from the older floating-name `python:3.12-slim` digest to the explicit Python 3.12.16 slim-trixie image index digest `sha256:4840d514c583a4d3d8cad3940e68dee6f0f6f3635c12fcd0a3d74c21a5b93a54`. The Debian APT snapshot and exact FFmpeg package pin remain in place. The next CI run must prove that this combination builds and that the new OS package set is recorded.
-3. Trivy image scans are now wired into the container SBOM job for both production images. HIGH and CRITICAL findings, including findings without an upstream fix, fail the security gate. JSON scan reports are uploaded even when a scan fails. The gate is not considered passed until the new workflow run completes successfully.
-4. The existing CI SBOM inventory has no `review_required` or `unknown` rows, but metadata completeness is not the same as legal clearance. Several items need explicit interpretation below.
+1. The last completed pre-isolation container scan (CI run #484) failed the API image vulnerability gate. The web image scan passed at the HIGH/CRITICAL threshold used by that older workflow. PostgreSQL/media tests passed. That run is not evidence that the current images are clean.
+2. The API and media worker have now been split into separate Docker build targets. The API target excludes the FFmpeg/FFprobe executables and the PySceneDetect/OpenCV media-analysis dependencies. The worker target alone installs `requirements-worker.txt`, FFmpeg, and FFprobe.
+3. The web Nginx runtime now runs as UID 101 on unprivileged port 8080. The Python API and worker targets run as UID/GID 10001.
+4. The production Compose topology now applies read-only root filesystems, drops all Linux capabilities from API/worker/web, enables `no-new-privileges`, mounts bounded writable tmpfs paths, and sets PID/CPU/memory limits. The proxy is digest-pinned and retains only `NET_BIND_SERVICE`.
+5. CI now generates separate SBOMs for API, worker, and web runtime images. Trivy scans all three at every severity (`UNKNOWN, LOW, MEDIUM, HIGH, CRITICAL`), includes unfixed findings, and fails the gate on any known vulnerability or scan error. The JSON reports are retained even when the gate fails.
+6. These changes reduce the API's attack surface and limit the blast radius of media-parser compromise. They do not make the worker vulnerability-free, and they do not guarantee that the application cannot be compromised.
+
+## Media-processing risk: unresolved release blocker
+
+The worker still uses Debian FFmpeg `7:7.1.5-0+deb13u1` and the OpenCV wheel's bundled FFmpeg libraries. Debian's tracker currently marks the Trixie FFmpeg package vulnerable to multiple CVEs, including CVE-2026-75143. The newer Debian Forky FFmpeg package fixes that specific issue, but the tracker also lists later vulnerabilities affecting releases through FFmpeg 9.0.2. Blindly upgrading the version or changing distributions is therefore not proof of a clean media stack.
+
+Required next work:
+- Review each worker Trivy finding against the Debian and upstream FFmpeg trackers.
+- Identify which demuxers, decoders, protocols, filters, and encoders EDITFLOW actually needs.
+- Reduce enabled media functionality where compatible with product requirements; reject unsupported formats explicitly.
+- Evaluate a maintained upstream build with verified security patches and reproducible source provenance. Do not disguise an unrecognized binary version to make the scanner pass.
+- Keep the worker isolated from the public ingress, run it unprivileged, limit resources, and give it only the database/object-storage/evidence-provider credentials it needs.
+- If no corrected upstream release exists for a finding, retain the failing gate and block production rather than suppressing the CVE.
+
+References:
+- Debian FFmpeg tracker: https://security-tracker.debian.org/tracker/ffmpeg
+- CVE-2026-75143: https://security-tracker.debian.org/tracker/CVE-2026-75143
+- FFmpeg security advisories: https://www.ffmpeg.org/security.html
+- FFmpeg releases: https://www.ffmpeg.org/download.html
 
 ## License review requiring manual attention
 
-### FFmpeg and codec stack (API image)
+### FFmpeg and codec stack (worker image)
 
-The captured FFmpeg build configuration includes `--enable-gpl`, `--enable-libx264`, and `--enable-libx265`. The package metadata also reports GPL-family and LGPL-family licenses among the FFmpeg/codec package set.
-
-- Treat this FFmpeg build as GPL-enabled; do not label the complete FFmpeg binary as LGPL-only.
-- Confirm which codecs and libraries are actually used by the application, whether the deployed container is only operated as a hosted service or is distributed to customers, and whether any binary/container distribution triggers corresponding source and license-notice obligations.
-- Preserve the exact Debian copyright files and FFmpeg build configuration in release artifacts.
-- If a non-GPL distribution posture is required, replace this build with a deliberately configured LGPL-compatible FFmpeg build and validate required codecs/features. Do not merely edit the license inventory label.
+The observed Debian FFmpeg build configuration includes `--enable-gpl`, `--enable-libx264`, `--enable-libx265`, and `--enable-libxvid`. Treat this build as GPL-enabled, not LGPL-only. Preserve the exact Debian copyright files, build configuration, and worker SBOM with every release artifact. The project owner/legal reviewer must determine whether the deployment model distributes the worker image or binaries to customers and what corresponding-source and notice obligations apply.
 
 ### OpenCV bundled FFmpeg
 
-The SBOM separately identifies an FFmpeg 8.1.1 binary bundled with the OpenCV Python wheel. The inventory's LGPL-2.1 manual override is based on the upstream wheel notice. Keep this distinct from Debian's GPL-enabled system FFmpeg package. Verify the exact installed wheel, bundled binary provenance, and upstream notice for the wheel version in each release.
+`scenedetect-headless` is installed only in the worker image through `apps/api/requirements-worker.txt`. Its OpenCV headless wheel bundles its own FFmpeg libraries, distinct from the Debian FFmpeg executable. Verify the exact wheel version and upstream license notice in every release SBOM.
 
 ### Python and Node runtimes
 
-- Python 3.12.16 is marked PSF-2.0 from the upstream Python license.
-- Node.js 22.23.5 is marked MIT from its upstream license.
-- Preserve upstream license texts alongside the SBOM, as CI currently does.
+- Python 3.12.16: PSF-2.0.
+- Node.js 22.23.5: MIT, with separately licensed third-party components in its distribution.
+- Preserve the license archives generated by CI.
 
-### esbuild and Go toolchain metadata
+### esbuild, Go metadata, and distro license strings
 
-The web build SBOM contains esbuild and `golang.org/x/sys` components with manual MIT/BSD overrides. These are build-stage components, not production runtime components. Verify these overrides against the exact source release metadata when upgrading the Node/Vite toolchain. Keep them classified as build-time dependencies.
-
-### Debian/Alpine package license strings
-
-Distro package metadata often lists multiple licenses because different files in a source package can have different licenses. The semicolon-separated inventory is an evidence index, not an SPDX OR expression and not a conclusion that every license applies to the whole package. For redistribution, retain the distro copyright files and map obligations to the actual shipped binaries/files.
+Build-stage components such as esbuild and `golang.org/x/sys` require version-specific license metadata review. Distro package metadata can list several licenses because files within a source package differ; a semicolon-separated inventory is evidence, not an SPDX OR expression or legal conclusion.
 
 ## Dependency reproducibility gaps
 
-- The web dependency tree is reproducible through the committed npm lockfile and `npm ci`.
-- API `requirements.txt` still uses version ranges rather than a fully hash-locked Python dependency set. A successful SBOM records what happened in one build, but does not make future builds deterministic. Add a generated, reviewed Python lock/constraints file with hashes before claiming fully reproducible dependency resolution.
-- CI service images and GitHub Actions should also be pinned to immutable digests/SHAs in a separate hardening pass; this review updated production Docker base images only.
+- Web dependencies use a committed npm lockfile and `npm ci`.
+- Python production dependencies still use version ranges without a committed hash-locked resolver file. The new worker requirements file separates media dependencies, but it does not yet make Python dependency resolution fully reproducible.
+- GitHub Actions and the PostgreSQL CI service image still need a separate immutable SHA/digest pinning pass.
 
 ## Required evidence before marking the PR ready
 
-- New CI run succeeds after both base image digest updates.
-- Trivy JSON reports for API and web are reviewed; no unresolved HIGH/CRITICAL findings are accepted without a documented, time-bounded risk exception.
-- New CycloneDX SBOMs and license inventories are regenerated from the refreshed images.
-- The Nginx runtime SBOM reports the updated Nginx/Alpine versions and no longer reports Alpine 3.21.
-- FFmpeg GPL implications and distribution model are reviewed by the project owner/legal reviewer.
-- Python dependency resolution is locked and hash-verified, or the remaining non-reproducibility is explicitly accepted.
+- Latest CI run completes on the exact PR head.
+- API, worker, and web images build and pass runtime identity/configuration checks.
+- All three Trivy reports are reviewed; the gate reports zero known vulnerabilities at every severity. Any exception requires explicit owner approval, impact assessment, mitigation, and expiry; it must not be silently ignored.
+- New CycloneDX SBOMs and license inventories are regenerated from the exact images that would be released.
+- Media formats and FFmpeg codec/protocol requirements are documented, and the worker risk is resolved rather than hidden.
+- Python dependency resolution is hash-locked or its reproducibility limitation is explicitly accepted.
+- Production deployment is tested separately with real TLS, managed PostgreSQL, S3 permissions, backups, monitoring, and incident-response procedures.
 
-## References
-
-- Alpine release lifecycle: https://www.alpinelinux.org/releases/
-- Debian FFmpeg security tracker: https://security-tracker.debian.org/tracker/ffmpeg
-- Debian DSA-6361-1: https://security-tracker.debian.org/tracker/DSA-6361-1
-- Trivy: https://github.com/aquasecurity/trivy
+**No production-readiness claim is authorized by this document.**
