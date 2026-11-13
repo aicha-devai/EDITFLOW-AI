@@ -29,9 +29,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 COPY requirements.txt .
-# Upgrade the installer to the fixed release identified by the prior Trivy scan.
+# Pin the pip installer and install scanner-confirmed fixed Python dependency versions.
 RUN python -m pip install --no-cache-dir --upgrade "pip==26.2.0" && \
-    python -m pip install --no-cache-dir -r requirements.txt
+    python -m pip install --no-cache-dir -r requirements.txt && \
+    python -m pip check
 COPY --chown=10001:10001 app ./app
 COPY --chown=10001:10001 alembic ./alembic
 COPY --chown=10001:10001 alembic.ini ./alembic.ini
@@ -42,7 +43,7 @@ RUN mkdir -p /var/lib/editflow && chown 10001:10001 /var/lib/editflow
 # Only the isolated render worker receives FFmpeg/FFprobe.
 FROM runtime-base AS worker
 COPY requirements-worker.txt .
-RUN python -m pip install --no-cache-dir -r requirements-worker.txt
+RUN python -m pip install --no-cache-dir -r requirements-worker.txt && python -m pip check
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends ffmpeg=7:7.1.5-0+deb13u1; \

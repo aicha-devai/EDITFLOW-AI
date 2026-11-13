@@ -10,3 +10,9 @@ boto3>=1.35,<2
 httpx>=0.27,<1
 
 python-multipart>=0.0.9,<1
+
+# Explicitly hold scanner-confirmed Python dependencies at fixed releases.
+certifi==2026.10.18
+msgpack==1.2.3
+setuptools==84.1.0
+urllib3==2.8.0
