@@ -1,0 +1,230 @@
+{
+  "@context": "https://openvex.dev/ns/v0.2.0",
+  "@id": "https://github.com/aicha-devai/EDITFLOW-AI/security/vex/ffmpeg-triage-2026-11-13",
+  "author": "EDITFLOW Security Review",
+  "timestamp": "2026-11-13T14:35:00Z",
+  "version": 1,
+  "statements": [
+    {
+      "vulnerability": {
+        "name": "CVE-2026-58049"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "RASC is not in the explicit decoder allowlist; only h264, hevc, vp8, vp9, av1, prores, mpeg4 and mjpeg video decoders are accepted."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-64830"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The VobSub .sub/.idx demuxer is outside the mov,matroska format allowlist; subtitle codecs are not in the decoder allowlist."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-64832"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The Debian FFmpeg build does not enable CUDA/NVDEC. CI asserts that CUDA hardware acceleration and *_cuvid/NVDEC decoders are absent."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-64833"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The render command always muxes MP4 output with H.264/AAC; it never selects the S/PDIF muxer."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-64834"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "RTP/ASF demuxing is not allowed: input protocols are restricted to file,pipe and demuxers to mov,matroska."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-64835"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "ADX/AAX codecs are not in the explicit decoder allowlist; the accepted audio codecs are AAC, MP3, Opus, Vorbis, PCM, ALAC, AC3, EAC3 and FLAC."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-66036"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The renderer constructs a fixed filter graph (trim, setpts, fps, scale, pad, setsar, format, overlay, amix); hqdn3d is not reachable and custom filters are rejected."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-66039"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "CAF is outside the mov,matroska demuxer allowlist and MACE6 is not in the decoder allowlist."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-66040"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The renderer outputs only H.264/AAC MP4 and does not invoke PNG/APNG encoders; PNG input is also excluded by the codec allowlist."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-66041"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "PGS/SUP subtitle input is outside the supported demuxer/codec allowlists; the renderer maps only video and optional audio streams."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-70628"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "WTV is outside the mov,matroska demuxer allowlist and DVB subtitle codecs are not accepted."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-70632"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "CFHD is not in the explicit video decoder allowlist; the format and codec allowlists reject this path before decode."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-75141"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "HEVC may be decoded as input, but the renderer always decodes and re-encodes video with libx264; it never stream-copies or muxes HEVC/hvcC output."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-75142"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The output container is MP4 only; the MPEG-PS muxer is never selected."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-75143"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The RIST protocol is excluded by the file,pipe protocol whitelist; uploaded media is read from local temporary files only."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-75144"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The renderer does not use RTP output or the VC-2/Dirac RTP packetizer; it always writes MP4."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-75146"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "DASH is excluded by the mov,matroska demuxer allowlist and network protocols are not permitted."
+    }
+  ]
+}

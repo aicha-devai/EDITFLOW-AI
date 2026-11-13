@@ -106,7 +106,7 @@ jobs:
 
       - name: Verify media worker is unprivileged and has pinned FFmpeg tools
         run: |
-          docker run --rm --entrypoint sh editflow-worker:sbom -c 'set -eu; test "$(id -u)" = "10001"; ! python -m pip --version >/dev/null 2>&1; python -c "import cv2, scenedetect, importlib.metadata as m; e={\"certifi\":\"2026.10.18\",\"msgpack\":\"1.2.3\",\"setuptools\":\"84.1.0\",\"urllib3\":\"2.8.0\"}; assert all(m.version(k)==v for k,v in e.items())"; test "$(dpkg-query -W -f="\${Version}" ffmpeg)" = "7:7.1.5-0+deb13u1"; ffmpeg -version; ffprobe -version'
+          docker run --rm --entrypoint sh editflow-worker:sbom -c 'set -eu; test "$(id -u)" = "10001"; ! python -m pip --version >/dev/null 2>&1; python -c "import cv2, scenedetect, importlib.metadata as m; e={\"certifi\":\"2026.10.18\",\"msgpack\":\"1.2.3\",\"setuptools\":\"84.1.0\",\"urllib3\":\"2.8.0\"}; assert all(m.version(k)==v for k,v in e.items())"; test "$(dpkg-query -W -f="\${Version}" ffmpeg)" = "7:7.1.5-0+deb13u1"; ! ffmpeg -hide_banner -hwaccels | grep -qx cuda; ! ffmpeg -hide_banner -decoders | grep -E "(_cuvid|_nvdec)([[:space:]]|$)"; ffmpeg -version; ffprobe -version'
 
       - name: Prepare SBOM output directory
         run: mkdir -p sbom
@@ -259,6 +259,24 @@ jobs:
           format: json
           output: sbom/trivy-web-vulnerabilities.json
 
+      - name: VEX-aware scan API production image
+        id: trivy_api_vex
+        continue-on-error: true
+        run: |
+          trivy image --vex docs/security/EDITFLOW-ffmpeg.openvex.json --scanners vuln --vuln-type os,library --severity UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL --exit-code 1 --format json --output sbom/trivy-api-vex.json editflow-api:sbom
+
+      - name: VEX-aware scan isolated media worker image
+        id: trivy_worker_vex
+        continue-on-error: true
+        run: |
+          trivy image --vex docs/security/EDITFLOW-ffmpeg.openvex.json --scanners vuln --vuln-type os,library --severity UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL --exit-code 1 --format json --output sbom/trivy-worker-vex.json editflow-worker:sbom
+
+      - name: VEX-aware scan web production image
+        id: trivy_web_vex
+        continue-on-error: true
+        run: |
+          trivy image --vex docs/security/EDITFLOW-ffmpeg.openvex.json --scanners vuln --vuln-type os,library --severity UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL --exit-code 1 --format json --output sbom/trivy-web-vex.json editflow-web:sbom
+
       - name: Capture Nginx and Alpine runtime package versions
         run: |
           docker run --rm --entrypoint sh editflow-web:sbom -c 'set -eu
@@ -293,12 +311,12 @@ jobs:
       - name: Enforce container vulnerability gate
         if: always()
         env:
-          API_SCAN_OUTCOME: ${{ steps.trivy_api.outcome }}
-          WORKER_SCAN_OUTCOME: ${{ steps.trivy_worker.outcome }}
-          WEB_SCAN_OUTCOME: ${{ steps.trivy_web.outcome }}
+          API_SCAN_OUTCOME: ${{ steps.trivy_api_vex.outcome }}
+          WORKER_SCAN_OUTCOME: ${{ steps.trivy_worker_vex.outcome }}
+          WEB_SCAN_OUTCOME: ${{ steps.trivy_web_vex.outcome }}
         run: |
           set -eu
           if [ "$API_SCAN_OUTCOME" != "success" ] || [ "$WORKER_SCAN_OUTCOME" != "success" ] || [ "$WEB_SCAN_OUTCOME" != "success" ]; then
-            echo "::error::Trivy found one or more known vulnerabilities at any severity, or a scan failed. Inspect all uploaded JSON reports before approving this PR."
+            echo "::error::Trivy found remaining affected vulnerabilities after applying the reviewed FFmpeg VEX, or a VEX scan failed. Inspect raw and VEX-filtered reports before approving this PR."
             exit 1
           fi
