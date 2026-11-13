@@ -9,7 +9,7 @@ FROM nginx:1.30.6-alpine3.24-slim@sha256:f65ed258206d1eb6c4eb6141111715a2cf94ac0
 # CVE-2026-4738 is fixed in Alpine zlib 1.4-r0; keep the runtime base
 # digest-pinned and explicitly require the fixed zlib package revision.
 RUN apk add --no-cache 'zlib=1.4-r0' && \
-    test "$(apk info -v zlib)" = "zlib-1.4-r0"
+    apk info -v | grep -Fx 'zlib-1.4-r0'
 COPY --chown=101:101 --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 RUN set -eux; \
