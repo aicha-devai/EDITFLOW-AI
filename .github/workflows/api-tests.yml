@@ -106,7 +106,7 @@ jobs:
 
       - name: Verify media worker is unprivileged and has pinned FFmpeg tools
         run: |
-          docker run --rm --entrypoint sh editflow-worker:sbom -c 'set -eu; test "$(id -u)" = "10001"; ! python -m pip --version >/dev/null 2>&1; python -c "import cv2, scenedetect, importlib.metadata as m; e={\"certifi\":\"2026.10.18\",\"msgpack\":\"1.2.3\",\"setuptools\":\"84.1.0\",\"urllib3\":\"2.8.0\"}; assert all(m.version(k)==v for k,v in e.items())"; test "$(dpkg-query -W -f="\${Version}" ffmpeg)" = "7:7.1.5-0+deb13u1"; ! ffmpeg -hide_banner -hwaccels | grep -qx cuda; ! ffmpeg -hide_banner -decoders | grep -E "(_cuvid|_nvdec)([[:space:]]|$)"; ffmpeg -version; ffprobe -version'
+          docker run --rm --entrypoint sh editflow-worker:sbom -c 'set -eu; test "$(id -u)" = "10001"; ! python -m pip --version >/dev/null 2>&1; python -c "import cv2, scenedetect, importlib.metadata as m; e={\"certifi\":\"2026.10.18\",\"msgpack\":\"1.2.3\",\"setuptools\":\"84.1.0\",\"urllib3\":\"2.8.0\"}; assert all(m.version(k)==v for k,v in e.items())"; test "$(dpkg-query -W -f="\${Version}" ffmpeg)" = "7:7.1.5-0+deb13u1"; ! ffmpeg -hide_banner -hwaccels | grep -qx cuda; ! ffmpeg -hide_banner -decoders | grep -E "(_cuvid|_nvdec)([[:space:]]|$)"; ! ffmpeg -buildconf 2>&1 | grep -q -- "--enable-mbedtls"; ffmpeg -version; ffprobe -version'
 
       - name: Prepare SBOM output directory
         run: mkdir -p sbom
