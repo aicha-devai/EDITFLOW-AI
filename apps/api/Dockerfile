@@ -29,8 +29,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 COPY requirements.txt .
-# Pin the pip installer and install scanner-confirmed fixed Python dependency versions.
-RUN python -m pip install --no-cache-dir --upgrade "pip==26.2.0" && \
+# pip 26.3 updates its bundled certifi/msgpack/urllib3; pip is build-only
+# and is removed from each final runtime target after dependency installation.
+RUN python -m pip install --no-cache-dir --upgrade "pip==26.3" && \
     python -m pip install --no-cache-dir -r requirements.txt && \
     python -m pip check
 COPY --chown=10001:10001 app ./app
@@ -43,7 +44,9 @@ RUN mkdir -p /var/lib/editflow && chown 10001:10001 /var/lib/editflow
 # Only the isolated render worker receives FFmpeg/FFprobe.
 FROM runtime-base AS worker
 COPY requirements-worker.txt .
-RUN python -m pip install --no-cache-dir -r requirements-worker.txt && python -m pip check
+RUN python -m pip install --no-cache-dir -r requirements-worker.txt && \
+    python -m pip check && \
+    python -m pip uninstall -y pip
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends ffmpeg=7:7.1.5-0+deb13u1; \
@@ -55,6 +58,7 @@ CMD ["python", "-m", "app.worker_main"]
 # Keep the public API as the default Docker build target. It does not contain
 # the FFmpeg/FFprobe command-line tools used only by the isolated worker.
 FROM runtime-base AS api
+RUN python -m pip uninstall -y pip
 USER 10001:10001
 EXPOSE 8000
 CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
