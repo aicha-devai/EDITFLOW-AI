@@ -43,7 +43,7 @@ async def test_probe_media_reports_video_and_audio_streams_and_enforces_parser_p
     assert info.format_name == "mov,mp4,m4a,3gp,3g2,mj2"
     args = list(captured["args"])
     assert args[args.index("-protocol_whitelist") + 1] == "file,pipe"
-    assert args[args.index("-format_whitelist") + 1] == "mov,matroska"
+    assert args[args.index("-format_whitelist") + 1] == "mov"
     assert "cfhd" not in args[args.index("-codec_whitelist") + 1]
     assert args[-1] == "/media/sample.mp4"
 
