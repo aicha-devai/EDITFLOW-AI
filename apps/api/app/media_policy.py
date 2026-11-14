@@ -1,21 +1,21 @@
 """Strict allowlists for untrusted media parsed by FFmpeg/FFprobe.
 
-The product accepts MP4/MOV/WebM containers only. These controls deliberately
+The product temporarily accepts MP4/MOV only. WebM/Matroska, HEVC, and AV1 are disabled while the HDR+ metadata CVE remains unpatched. These controls deliberately
 limit demuxers, protocols, and codecs before any media parser is invoked.
 """
 from __future__ import annotations
 
-MEDIA_DEMUXER_WHITELIST = "mov,matroska"
+MEDIA_DEMUXER_WHITELIST = "mov"
 MEDIA_PROTOCOL_WHITELIST = "file,pipe"
 MEDIA_CODEC_WHITELIST = (
-    "h264,hevc,vp8,vp9,av1,prores,mpeg4,mjpeg,"
-    "aac,mp3,opus,vorbis,pcm_s16le,pcm_s24le,alac,ac3,eac3,flac"
+    "h264,prores,mpeg4,mjpeg,"
+    "aac,mp3,pcm_s16le,pcm_s24le,alac,ac3,eac3,flac"
 )
 SUPPORTED_VIDEO_CODECS = frozenset({
-    "h264", "hevc", "vp8", "vp9", "av1", "prores", "mpeg4", "mjpeg",
+    "h264", "prores", "mpeg4", "mjpeg",
 })
 SUPPORTED_AUDIO_CODECS = frozenset({
-    "aac", "mp3", "opus", "vorbis", "pcm_s16le", "pcm_s24le",
+    "aac", "mp3", "pcm_s16le", "pcm_s24le",
     "alac", "ac3", "eac3", "flac",
 })
 
