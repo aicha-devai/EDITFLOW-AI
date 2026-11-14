@@ -156,3 +156,23 @@ async def test_scene_detection_cancellation_kills_subprocess_and_propagates(monk
 
     assert process.killed is True
     assert process.calls == 2
+
+@pytest.mark.asyncio
+async def test_render_evidence_rejects_source_before_any_secondary_parser(monkeypatch, tmp_path):
+    import app.evidence_extraction as extraction
+    from app.media_probe import MediaProbeError
+
+    async def reject_source(_path):
+        raise MediaProbeError("unsupported media container")
+
+    async def parser_must_not_run(*_args, **_kwargs):
+        raise AssertionError("No secondary parser may run before source validation")
+
+    monkeypatch.setattr(extraction, "probe_media", reject_source)
+    monkeypatch.setattr(extraction, "extract_representative_keyframes", parser_must_not_run)
+
+    with pytest.raises(extraction.EvidenceExtractionError, match="security validation"):
+        await extraction.extract_render_evidence(
+            "untrusted.bin", tmp_path / "evidence",
+            duration_seconds=3.0, includes_audio=False,
+        )
