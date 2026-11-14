@@ -71,8 +71,8 @@ async def probe_media(path: str, timeout_seconds: int = 30) -> MediaInfo:
         raise MediaProbeError("Input asset has no video stream")
     format_name = fmt.get("format_name")
     formats = set(str(format_name or "").split(","))
-    if not formats.intersection({"mov", "matroska"}):
-        raise MediaProbeError("Unsupported media container; only MP4, MOV, and WebM are accepted")
+    if "mov" not in formats:
+        raise MediaProbeError("Unsupported media container; only MP4 and MOV are accepted")
     video_codec = video.get("codec_name")
     if video_codec not in SUPPORTED_VIDEO_CODECS:
         raise MediaProbeError(f"Unsupported video codec: {video_codec or 'unknown'}")
