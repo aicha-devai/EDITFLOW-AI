@@ -21,7 +21,7 @@ SUPPORTED_AUDIO_CODECS = frozenset({
 
 
 def media_input_options() -> list[str]:
-    """FFmpeg input options for uploaded MP4/MOV/WebM assets."""
+    """FFmpeg input options for uploaded MP4/MOV assets."""
     return [
         "-protocol_whitelist", MEDIA_PROTOCOL_WHITELIST,
         "-format_whitelist", MEDIA_DEMUXER_WHITELIST,
