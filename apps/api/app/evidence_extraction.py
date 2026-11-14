@@ -18,6 +18,8 @@ from typing import Any
 import httpx
 
 from app.scene_detection import SceneDetectionError, detect_scene_changes
+from app.media_policy import media_input_args
+from app.media_probe import MediaProbeError, probe_media
 
 
 class EvidenceExtractionError(RuntimeError):
@@ -114,7 +116,7 @@ async def _ffmpeg_scene_change_timestamps(
 ) -> list[float]:
     """Fallback detector, bounded by the same caller-provided timeout."""
     _, stderr = await _run([
-        "ffmpeg", "-hide_banner", "-nostdin", "-v", "info", "-i", video_path,
+        "ffmpeg", "-hide_banner", "-nostdin", "-v", "info", *media_input_args(video_path),
         "-vf", f"select='gt(scene,{threshold})',showinfo", "-an", "-f", "null", "-",
     ], timeout_seconds)
     return [float(value) for value in re.findall(
@@ -127,7 +129,9 @@ async def _perceptual_hash(image_path: str | Path) -> str | None:
     try:
         raw, _ = await _run([
             "ffmpeg", "-hide_banner", "-loglevel", "error", "-nostdin",
-            "-i", str(image_path), "-vf", "scale=9:8:flags=area,format=gray",
+            "-protocol_whitelist", "file,pipe", "-format_whitelist", "image2",
+            "-codec_whitelist", "mjpeg", "-i", str(image_path),
+            "-vf", "scale=9:8:flags=area,format=gray",
             "-frames:v", "1", "-f", "rawvideo", "-",
         ], 30)
     except EvidenceExtractionError:
@@ -177,7 +181,7 @@ async def extract_representative_keyframes(
         output = target / filename
         await _run([
             "ffmpeg", "-hide_banner", "-loglevel", "error", "-nostdin",
-            "-ss", f"{timestamp:.3f}", "-i", video_path, "-frames:v", "1",
+            "-ss", f"{timestamp:.3f}", *media_input_args(video_path), "-frames:v", "1",
             "-vf", "scale='min(640,iw)':-2", "-q:v", "4", "-y", str(output),
         ], min(timeout_seconds, 120))
         if not output.is_file() or output.stat().st_size <= 0:
@@ -199,7 +203,8 @@ async def extract_audio_track(video_path: str, output_path: str | Path, timeout_
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
     await _run([
-        "ffmpeg", "-hide_banner", "-loglevel", "error", "-nostdin", "-i", video_path,
+        "ffmpeg", "-hide_banner", "-loglevel", "error", "-nostdin",
+        *media_input_args(video_path),
         "-vn", "-ac", "1", "-ar", "16000", "-c:a", "libmp3lame", "-b:a", "48k",
         "-y", str(output),
     ], timeout_seconds)
@@ -338,6 +343,10 @@ async def extract_render_evidence(
     vision_endpoint: str = "https://api.openai.com/v1/chat/completions",
     vision_model: str = "gpt-4o-mini", timeout_seconds: int = 900,
 ) -> dict[str, Any]:
+    try:
+        await probe_media(video_path)
+    except MediaProbeError as exc:
+        raise EvidenceExtractionError(f"Source media failed security validation: {exc}") from exc
     root = Path(work_dir)
     frames = await extract_representative_keyframes(
         video_path, root / "frames", duration_seconds=duration_seconds,
