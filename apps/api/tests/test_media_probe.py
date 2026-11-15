@@ -151,7 +151,7 @@ async def test_probe_rejects_extended_size_pssh_before_invoking_ffprobe(tmp_path
     source = tmp_path / "extended-pssh.mp4"
     source.write_bytes(
         _mp4_box(b"ftyp", b"isom0000")
-        + _mp4_box(b"moov", _mp4_box_extended(b"pssh", b"\\x00\\x00\\x00\\x00"))
+        + _mp4_box(b"moov", _mp4_box_extended(b"pssh", b"\x00\x00\x00\x00"))
     )
 
     async def parser_must_not_run(*_args, **_kwargs):
