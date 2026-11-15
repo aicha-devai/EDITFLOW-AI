@@ -111,6 +111,19 @@ async def test_probe_media_rejects_hdr_and_webm_video_codecs(monkeypatch, codec)
     with pytest.raises(MediaProbeError, match="Unsupported video codec"):
         await probe_media("/media/source.mp4")
 
+def test_media_codec_allowlist_excludes_unpatched_decoder_families():
+    from app.media_policy import MEDIA_CODEC_WHITELIST, SUPPORTED_AUDIO_CODECS, SUPPORTED_VIDEO_CODECS
+
+    allowed = set(MEDIA_CODEC_WHITELIST.split(","))
+    assert allowed == SUPPORTED_AUDIO_CODECS | SUPPORTED_VIDEO_CODECS
+    assert not allowed.intersection({
+        "binkvideo", "motionpixels", "tqi", "jv", "mp3adu",
+        "imc", "ape", "musepack7", "exr", "vmnc", "tak", "als",
+        "targa", "evc", "hap", "flashsv", "cook", "interplayacm",
+        "av1", "hevc",
+    })
+
+
 def _mp4_box(kind: bytes, payload: bytes = b"") -> bytes:
     return struct.pack(">I4s", 8 + len(payload), kind) + payload
 
