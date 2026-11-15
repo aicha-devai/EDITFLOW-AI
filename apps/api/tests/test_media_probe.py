@@ -120,7 +120,7 @@ def test_media_codec_allowlist_excludes_unpatched_decoder_families():
         "binkvideo", "motionpixels", "tqi", "jv", "mp3adu",
         "imc", "ape", "musepack7", "exr", "vmnc", "tak", "als",
         "targa", "evc", "hap", "flashsv", "cook", "interplayacm",
-        "av1", "hevc", "jpeg2000",
+        "av1", "hevc", "jpeg2000", "svg",
     })
 
 
