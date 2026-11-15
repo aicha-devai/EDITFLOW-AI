@@ -49,6 +49,8 @@ RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends ffmpeg=7:7.1.5-0+deb13u1; \
     test "$(dpkg-query -W -f='${Version}' ffmpeg)" = "7:7.1.5-0+deb13u1"; \
+    find /usr/local/lib/python3.12 -type f -name '_sqlite3*.so' -delete; \
+    ! python -c "import _sqlite3" >/dev/null 2>&1; \
     for name in mount umount nsenter; do path="$(command -v "$name" || true)"; if [ -n "$path" ]; then rm -f "$path"; fi; done; \
     ! command -v mount >/dev/null 2>&1; \
     ! command -v umount >/dev/null 2>&1; \
@@ -62,6 +64,8 @@ CMD ["python", "-m", "app.worker_main"]
 FROM runtime-base AS api
 RUN python -m pip uninstall -y pip
 RUN set -eux; \
+    find /usr/local/lib/python3.12 -type f -name '_sqlite3*.so' -delete; \
+    ! python -c "import _sqlite3" >/dev/null 2>&1; \
     for name in mount umount nsenter; do path="$(command -v "$name" || true)"; if [ -n "$path" ]; then rm -f "$path"; fi; done; \
     ! command -v mount >/dev/null 2>&1; \
     ! command -v umount >/dev/null 2>&1; \
