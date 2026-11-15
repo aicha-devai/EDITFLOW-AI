@@ -2,20 +2,6 @@
 
 This file records third-party software intentionally used by EDITFLOW AI or reviewed during engineering. It is not a claim that the listed projects are owned by EDITFLOW AI.
 
-## Included as a runtime dependency
-
-### PySceneDetect
-
-- Upstream: https://github.com/Breakthrough/PySceneDetect
-- Package: `scenedetect-headless`
-- Version constraint: `>=0.7.3,<1`
-- License: BSD 3-Clause
-- Copyright: Copyright (C) 2014, Brandon Castellano
-- Use in EDITFLOW AI: scene-boundary detection during timestamped render-evidence extraction.
-- Integration: imported as an installed third-party package through `apps/api/requirements.txt`; upstream source is not copied or vendored.
-- Local changes: EDITFLOW AI contains its own adapter in `apps/api/app/scene_detection.py`; no modifications are made to PySceneDetect itself.
-- License text: [third_party/licenses/PYSCENEDETECT-BSD-3-CLAUSE.txt](third_party/licenses/PYSCENEDETECT-BSD-3-CLAUSE.txt)
-
 ## Engineering references reviewed; no source code copied or dependency added
 
 These repositories were inspected for architectural ideas only. EDITFLOW AI does not redistribute their code as part of this integration.
@@ -49,23 +35,13 @@ These repositories were inspected for architectural ideas only. EDITFLOW AI does
 3. Generate and review a complete Software Bill of Materials (SBOM), including transitive Python and OS packages, before public commercial distribution.
 4. Do not imply endorsement by upstream maintainers or use their names/logos as product endorsements.
 
-### OpenCV-Python headless (transitive dependency)
-
-- Upstream: https://github.com/opencv/opencv-python
-- Package observed in the isolated worker SBOM: `opencv-python-headless 5.0.0.93`
-- OpenCV library license: Apache-2.0 (OpenCV 4.5.0 and later).
-- Wheel build scripts: MIT.
-- Bundled FFmpeg libraries: LGPL-2.1, as stated by the upstream wheel project.
-- Why present: transitive dependency of `scenedetect-headless`, installed only through `apps/api/requirements-worker.txt`; the headless wheel is appropriate for a server/container without GUI requirements.
-- Important distinction: this wheel bundles its own FFmpeg shared libraries in addition to the separate Debian `ffmpeg` executable installed by the isolated worker Dockerfile. The bundled wheel libraries must be included in the worker release inventory separately from the worker's system FFmpeg package.
-
 ### FFmpeg in the isolated worker container (observed build snapshot)
 
 - Container image source: `apps/api/Dockerfile` (Python 3.12.16 slim-trixie image pinned by immutable index digest; Debian 13 at the time of the refreshed build).
 - Observed executable: FFmpeg `7.1.5-0+deb13u1`; FFprobe `7.1.5-0+deb13u1`.
 - Observed configure flags include `--enable-gpl`, `--enable-libx264`, `--enable-libx265`, and `--enable-libxvid`; `--enable-version3` was not present.
 - License consequence: this particular FFmpeg build is GPL-2.0-or-later, not an LGPL-only build. The FFmpeg project documents that enabling GPL components makes the resulting FFmpeg binaries/libraries GPL-covered. The exact Debian package copyright files and the SBOM must travel with any redistributed image.
-- The isolated render worker invokes the standalone FFmpeg executable as a separate process; this fact alone does not mean EDITFLOW's Python application source is automatically relicensed. Redistribution of the FFmpeg executable/container still carries its own license and corresponding-source obligations.
+- The isolated render worker invokes the standalone FFmpeg executable as a separate process; this fact alone does not mean EDITFLOW's Python application source is automatically relicensed. The worker no longer installs PySceneDetect/OpenCV or their separately bundled FFmpeg libraries. Redistribution of the FFmpeg executable/container still carries its own license and corresponding-source obligations.
 - Reproducibility: the API and worker targets share the pinned Python 3.12.16 slim-trixie base by immutable image-index digest; only the worker target installs the exact Debian FFmpeg package version `7:7.1.5-0+deb13u1` from a dated Debian Snapshot. The next CI run must verify the refreshed base + snapshot combination and preserve the resulting SBOM and Debian copyright archive.
 - CI preserves the CycloneDX container SBOM, license metadata inventory, exact FFmpeg build configuration, Debian package version list, and a tarball of installed Debian package copyright files as workflow artifacts.
 
