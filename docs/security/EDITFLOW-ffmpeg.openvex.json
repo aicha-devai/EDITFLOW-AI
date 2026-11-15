@@ -638,11 +638,14 @@
         },
         {
           "@id": "pkg:deb/debian/ncurses-base@6.5%2B20250216-2?arch=all&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/ncurses-bin@6.5%2B20250216-2?arch=amd64&distro=debian-13.7"
         }
       ],
       "status": "not_affected",
       "justification": "vulnerable_code_not_in_execute_path",
-      "impact_statement": "The vulnerable code is in the infocmp command-line executable. The runtime image purges ncurses-bin and CI verifies that the package and infocmp executable are absent. The remaining ncurses runtime libraries/terminfo data do not provide the vulnerable infocmp program."
+      "impact_statement": "The vulnerable code is in the infocmp command-line executable. The runtime image removes /usr/bin/infocmp and CI verifies that the executable is absent. The essential ncurses-bin package remains installed for other terminal utilities; the remaining ncurses runtime libraries and terminfo data do not provide the vulnerable infocmp program."
     },
     {
       "vulnerability": {
