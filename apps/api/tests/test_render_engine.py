@@ -1,3 +1,5 @@
+import struct
+
 import pytest
 
 from app.render_engine import RenderPlanError, build_ffmpeg_plan
@@ -84,4 +86,22 @@ def test_ffmpeg_plan_rejects_invalid_output_dimensions(width, height):
             {"asset-a": "/media/a.mp4", "asset-b": "/media/b.mp4"},
             "/renders/out.mp4",
             {"width": width, "height": height},
+        )
+
+
+def test_ffmpeg_plan_rejects_drm_pssh_source_as_a_validation_error(tmp_path):
+    source = tmp_path / "protected.mp4"
+
+    def box(kind: bytes, payload: bytes = b"") -> bytes:
+        return struct.pack(">I4s", 8 + len(payload), kind) + payload
+
+    source.write_bytes(
+        box(b"ftyp", b"isom0000")
+        + box(b"moov", box(b"pssh", b"\\x00\\x00\\x00\\x00"))
+    )
+    with pytest.raises(RenderPlanError, match="PSSH atoms are not supported"):
+        build_ffmpeg_plan(
+            _timeline(),
+            {"asset-a": str(source), "asset-b": "/media/b.mp4"},
+            "/renders/out.mp4",
         )
