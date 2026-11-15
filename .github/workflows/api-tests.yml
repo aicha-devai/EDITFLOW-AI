@@ -127,6 +127,13 @@ jobs:
           output-file: sbom/editflow-worker.cdx.json
           upload-artifact: false
 
+      - name: Validate OpenVEX product references against generated SBOMs
+        run: |
+          python tools/validate_vex_sbom.py \
+            docs/security/EDITFLOW-ffmpeg.openvex.json \
+            sbom/editflow-api.cdx.json \
+            sbom/editflow-worker.cdx.json
+
       - name: Record pinned production base image references
         run: |
           {
