@@ -2,8 +2,8 @@
   "@context": "https://openvex.dev/ns/v0.2.0",
   "@id": "https://github.com/aicha-devai/EDITFLOW-AI/security/vex/ffmpeg-triage-2026-11-13",
   "author": "EDITFLOW Security Review",
-  "timestamp": "2026-11-15T19:20:00Z",
-  "version": 14,
+  "timestamp": "2026-11-15T19:23:00Z",
+  "version": 15,
   "statements": [
     {
       "vulnerability": {
@@ -2719,6 +2719,45 @@
       "status": "not_affected",
       "justification": "vulnerable_code_not_in_execute_path",
       "impact_statement": "The Worker SBOM dependency graph shows libxi6 is consumed only by libsdl2, which is used by FFmpeg's optional SDL output device. The application render plan never selects an SDL output device (it writes the fixed MP4 output with libx264); a regression test asserts that no -f output-device selector is present. CI additionally verifies that DISPLAY is unset, no X11 socket exists, and Xorg/Xvfb/Xwayland servers are absent. These CVEs require a malicious X server to send XInput replies to a connected client, and the Worker has no X server connection path. Reassess if SDL output or X11 support is added."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-119373"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/libsqlite3-0@3.46.1-7%2Bdeb13u2?arch=amd64&distro=debian-13.7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The Worker SBOM dependency graph shows libsqlite3-0 is consumed only by Debian's liblastlog2-2; the application uses PostgreSQL and has no SQLite database path. The production API and Worker images remove Python's _sqlite3 extension, and CI verifies it cannot be imported. The only remaining consumer, liblastlog2, uses ordinary SQLite table operations (sqlite3_exec, sqlite3_prepare_v2, sqlite3_bind_text, sqlite3_step) for the system-owned lastlog database; its source does not invoke FTS5 or the session extension. CVE-2026-119373 and CVE-2026-119374 require FTS5 operations; CVE-2026-119379 requires sqlite3changeset_apply from the session extension. Those vulnerable APIs are not called by the application or the only remaining package consumer. Reassess if SQLite application support, FTS5, session changesets, or another SQLite consumer is added."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-119374"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/libsqlite3-0@3.46.1-7%2Bdeb13u2?arch=amd64&distro=debian-13.7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The Worker SBOM dependency graph shows libsqlite3-0 is consumed only by Debian's liblastlog2-2; the application uses PostgreSQL and has no SQLite database path. The production API and Worker images remove Python's _sqlite3 extension, and CI verifies it cannot be imported. The only remaining consumer, liblastlog2, uses ordinary SQLite table operations (sqlite3_exec, sqlite3_prepare_v2, sqlite3_bind_text, sqlite3_step) for the system-owned lastlog database; its source does not invoke FTS5 or the session extension. CVE-2026-119373 and CVE-2026-119374 require FTS5 operations; CVE-2026-119379 requires sqlite3changeset_apply from the session extension. Those vulnerable APIs are not called by the application or the only remaining package consumer. Reassess if SQLite application support, FTS5, session changesets, or another SQLite consumer is added."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-119379"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/libsqlite3-0@3.46.1-7%2Bdeb13u2?arch=amd64&distro=debian-13.7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The Worker SBOM dependency graph shows libsqlite3-0 is consumed only by Debian's liblastlog2-2; the application uses PostgreSQL and has no SQLite database path. The production API and Worker images remove Python's _sqlite3 extension, and CI verifies it cannot be imported. The only remaining consumer, liblastlog2, uses ordinary SQLite table operations (sqlite3_exec, sqlite3_prepare_v2, sqlite3_bind_text, sqlite3_step) for the system-owned lastlog database; its source does not invoke FTS5 or the session extension. CVE-2026-119373 and CVE-2026-119374 require FTS5 operations; CVE-2026-119379 requires sqlite3changeset_apply from the session extension. Those vulnerable APIs are not called by the application or the only remaining package consumer. Reassess if SQLite application support, FTS5, session changesets, or another SQLite consumer is added."
     }
   ]
 }
