@@ -1,3 +1,5 @@
+import struct
+
 import pytest
 
 from app.render_engine import RenderPlanError, build_ffmpeg_plan
@@ -39,6 +41,12 @@ def test_ffmpeg_plan_uses_resolved_paths_and_pinned_timeline_order():
     assert plan.input_asset_ids == ("asset-a", "asset-b")
     assert plan.includes_audio is True
     assert plan.argv.count("-i") == 2
+    assert plan.argv.count("-protocol_whitelist") == 2
+    assert plan.argv.count("-format_whitelist") == 2
+    assert plan.argv.count("-codec_whitelist") == 2
+    assert plan.argv[plan.argv.index("-c:v") + 1] == "libx264"
+    assert "-f" not in plan.argv  # no SDL or other user-selectable output device
+    assert "v4l2m2m" not in plan.argv
     assert "/media/a.mp4" in plan.argv
     assert "/media/b.mp4" in plan.argv
     assert "[vout]" in plan.argv
@@ -81,4 +89,22 @@ def test_ffmpeg_plan_rejects_invalid_output_dimensions(width, height):
             {"asset-a": "/media/a.mp4", "asset-b": "/media/b.mp4"},
             "/renders/out.mp4",
             {"width": width, "height": height},
+        )
+
+
+def test_ffmpeg_plan_rejects_drm_pssh_source_as_a_validation_error(tmp_path):
+    source = tmp_path / "protected.mp4"
+
+    def box(kind: bytes, payload: bytes = b"") -> bytes:
+        return struct.pack(">I4s", 8 + len(payload), kind) + payload
+
+    source.write_bytes(
+        box(b"ftyp", b"isom0000")
+        + box(b"moov", box(b"pssh", b"\x00\x00\x00\x00"))
+    )
+    with pytest.raises(RenderPlanError, match="PSSH atoms are not supported"):
+        build_ffmpeg_plan(
+            _timeline(),
+            {"asset-a": str(source), "asset-b": "/media/b.mp4"},
+            "/renders/out.mp4",
         )

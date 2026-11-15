@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from math import isfinite
 from typing import Mapping, Any
 
+from app.media_policy import MediaInputPolicyError, media_input_args
+
 
 class RenderPlanError(ValueError):
     """The timeline or render profile cannot be represented by the MVP renderer."""
@@ -88,7 +90,10 @@ def build_ffmpeg_plan(
             raise RenderPlanError(f"clip {index} has invalid timing")
         duration = source_out - source_in
         end_times.append(start + duration)
-        inputs.extend(["-i", source_path])
+        try:
+            inputs.extend(media_input_args(source_path))
+        except MediaInputPolicyError as exc:
+            raise RenderPlanError(str(exc)) from exc
         filters.append(
             f"[{index}:v:0]trim=start={source_in}:duration={duration},"
             f"setpts=PTS-STARTPTS,fps={fps},"

@@ -1,9 +1,11 @@
 import asyncio
 import json
+import struct
 
 import pytest
 
 from app.media_probe import MediaProbeError, probe_media
+from app.media_policy import MediaInputPolicyError, media_input_args
 
 
 class FakeProcess:
@@ -20,8 +22,11 @@ class FakeProcess:
 
 
 @pytest.mark.asyncio
-async def test_probe_media_reports_video_and_audio_streams(monkeypatch):
+async def test_probe_media_reports_video_and_audio_streams_and_enforces_parser_policy(monkeypatch):
+    captured = {}
+
     async def fake_create(*args, **kwargs):
+        captured["args"] = args
         return FakeProcess({
             "format": {"duration": "12.5", "format_name": "mov,mp4,m4a,3gp,3g2,mj2"},
             "streams": [
@@ -38,6 +43,11 @@ async def test_probe_media_reports_video_and_audio_streams(monkeypatch):
     assert info.width == 1080
     assert info.height == 1920
     assert info.format_name == "mov,mp4,m4a,3gp,3g2,mj2"
+    args = list(captured["args"])
+    assert args[args.index("-protocol_whitelist") + 1] == "file,pipe"
+    assert args[args.index("-format_whitelist") + 1] == "mov"
+    assert "cfhd" not in args[args.index("-codec_whitelist") + 1]
+    assert args[-1] == "/media/sample.mp4"
 
 
 @pytest.mark.asyncio
@@ -54,6 +64,19 @@ async def test_probe_media_rejects_audio_only_input(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_probe_media_rejects_unsupported_video_codec(monkeypatch):
+    async def fake_create(*args, **kwargs):
+        return FakeProcess({
+            "format": {"duration": "4", "format_name": "mov,mp4,m4a,3gp,3g2,mj2"},
+            "streams": [{"codec_type": "video", "codec_name": "cfhd", "width": 1920, "height": 1080}],
+        })
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_create)
+    with pytest.raises(MediaProbeError, match="Unsupported video codec"):
+        await probe_media("/media/cineform.mp4")
+
+
+@pytest.mark.asyncio
 async def test_probe_media_surfaces_ffprobe_error(monkeypatch):
     async def fake_create(*args, **kwargs):
         return FakeProcess({}, returncode=1, stderr=b"invalid file")
@@ -61,3 +84,122 @@ async def test_probe_media_surfaces_ffprobe_error(monkeypatch):
     monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_create)
     with pytest.raises(MediaProbeError, match="invalid file"):
         await probe_media("/media/broken.mp4")
+
+@pytest.mark.asyncio
+async def test_probe_media_rejects_matroska_even_when_ffprobe_returns_metadata(monkeypatch):
+    async def fake_create(*args, **kwargs):
+        return FakeProcess({
+            "format": {"duration": "4", "format_name": "matroska,webm"},
+            "streams": [{"codec_type": "video", "codec_name": "vp9", "width": 1280, "height": 720}],
+        })
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_create)
+    with pytest.raises(MediaProbeError, match="only MP4 and MOV"):
+        await probe_media("/media/source.webm")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("codec", ["hevc", "av1", "vp8", "vp9"])
+async def test_probe_media_rejects_hdr_and_webm_video_codecs(monkeypatch, codec):
+    async def fake_create(*args, **kwargs):
+        return FakeProcess({
+            "format": {"duration": "4", "format_name": "mov,mp4,m4a"},
+            "streams": [{"codec_type": "video", "codec_name": codec, "width": 1920, "height": 1080}],
+        })
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_create)
+    with pytest.raises(MediaProbeError, match="Unsupported video codec"):
+        await probe_media("/media/source.mp4")
+
+def test_media_codec_allowlist_excludes_unpatched_decoder_families():
+    from app.media_policy import MEDIA_CODEC_WHITELIST, SUPPORTED_AUDIO_CODECS, SUPPORTED_VIDEO_CODECS
+
+    allowed = set(MEDIA_CODEC_WHITELIST.split(","))
+    assert allowed == SUPPORTED_AUDIO_CODECS | SUPPORTED_VIDEO_CODECS
+    assert not allowed.intersection({
+        "binkvideo", "motionpixels", "tqi", "jv", "mp3adu",
+        "imc", "ape", "musepack7", "exr", "vmnc", "tak", "als",
+        "targa", "evc", "hap", "flashsv", "cook", "interplayacm",
+        "av1", "hevc", "jpeg2000", "svg",
+    })
+
+
+def test_media_protocol_allowlist_excludes_network_protocols():
+    from app.media_policy import MEDIA_PROTOCOL_WHITELIST
+
+    assert set(MEDIA_PROTOCOL_WHITELIST.split(",")) == {"file", "pipe"}
+
+
+def _mp4_box(kind: bytes, payload: bytes = b"") -> bytes:
+    return struct.pack(">I4s", 8 + len(payload), kind) + payload
+
+
+@pytest.mark.asyncio
+async def test_probe_rejects_pssh_before_invoking_ffprobe(tmp_path, monkeypatch):
+    source = tmp_path / "drm.mp4"
+    source.write_bytes(
+        _mp4_box(b"ftyp", b"isom0000")
+        + _mp4_box(b"moov", _mp4_box(b"pssh", b"\x00\x00\x00\x00"))
+    )
+
+    async def parser_must_not_run(*_args, **_kwargs):
+        raise AssertionError("ffprobe must not run for PSSH-containing media")
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", parser_must_not_run)
+    with pytest.raises(MediaProbeError, match="PSSH atoms are not supported"):
+        await probe_media(str(source))
+
+
+@pytest.mark.asyncio
+async def test_probe_rejects_top_level_pssh_before_invoking_ffprobe(tmp_path, monkeypatch):
+    source = tmp_path / "top-level-pssh.mp4"
+    source.write_bytes(_mp4_box(b"ftyp", b"isom0000") + _mp4_box(b"pssh", b"\x00\x00\x00\x00"))
+
+    async def parser_must_not_run(*_args, **_kwargs):
+        raise AssertionError("ffprobe must not run for PSSH-containing media")
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", parser_must_not_run)
+    with pytest.raises(MediaProbeError, match="PSSH atoms are not supported"):
+        await probe_media(str(source))
+
+def _mp4_box_extended(kind: bytes, payload: bytes = b"") -> bytes:
+    return struct.pack(">I4sQ", 1, kind, 16 + len(payload)) + payload
+
+
+@pytest.mark.asyncio
+async def test_probe_rejects_extended_size_pssh_before_invoking_ffprobe(tmp_path, monkeypatch):
+    source = tmp_path / "extended-pssh.mp4"
+    source.write_bytes(
+        _mp4_box(b"ftyp", b"isom0000")
+        + _mp4_box(b"moov", _mp4_box_extended(b"pssh", b"\x00\x00\x00\x00"))
+    )
+
+    async def parser_must_not_run(*_args, **_kwargs):
+        raise AssertionError("ffprobe must not run for extended-size PSSH media")
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", parser_must_not_run)
+    with pytest.raises(MediaProbeError, match="PSSH atoms are not supported"):
+        await probe_media(str(source))
+
+
+@pytest.mark.asyncio
+async def test_probe_fails_closed_on_malformed_atom_header(tmp_path, monkeypatch):
+    source = tmp_path / "malformed.mp4"
+    source.write_bytes(struct.pack(">I4s", 4, b"ftyp"))
+
+    async def parser_must_not_run(*_args, **_kwargs):
+        raise AssertionError("ffprobe must not run for malformed atom tables")
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", parser_must_not_run)
+    with pytest.raises(MediaProbeError, match="Invalid MP4 atom size"):
+        await probe_media(str(source))
+
+
+def test_render_input_arguments_reject_pssh_before_ffmpeg_receives_the_source(tmp_path):
+    source = tmp_path / "render-drm.mp4"
+    source.write_bytes(
+        _mp4_box(b"ftyp", b"isom0000")
+        + _mp4_box(b"moov", _mp4_box(b"pssh", b"\x00\x00\x00\x00"))
+    )
+    with pytest.raises(MediaInputPolicyError, match="PSSH atoms are not supported"):
+        media_input_args(str(source))
