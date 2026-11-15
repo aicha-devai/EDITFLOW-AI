@@ -124,6 +124,12 @@ def test_media_codec_allowlist_excludes_unpatched_decoder_families():
     })
 
 
+def test_media_protocol_allowlist_excludes_network_protocols():
+    from app.media_policy import MEDIA_PROTOCOL_WHITELIST
+
+    assert set(MEDIA_PROTOCOL_WHITELIST.split(",")) == {"file", "pipe"}
+
+
 def _mp4_box(kind: bytes, payload: bytes = b"") -> bytes:
     return struct.pack(">I4s", 8 + len(payload), kind) + payload
 
