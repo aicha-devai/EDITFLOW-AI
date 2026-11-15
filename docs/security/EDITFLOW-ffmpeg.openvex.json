@@ -2,8 +2,8 @@
   "@context": "https://openvex.dev/ns/v0.2.0",
   "@id": "https://github.com/aicha-devai/EDITFLOW-AI/security/vex/ffmpeg-triage-2026-11-13",
   "author": "EDITFLOW Security Review",
-  "timestamp": "2026-11-15T18:50:00Z",
-  "version": 8,
+  "timestamp": "2026-11-15T18:55:00Z",
+  "version": 9,
   "statements": [
     {
       "vulnerability": {
@@ -1576,6 +1576,43 @@
       "status": "not_affected",
       "justification": "vulnerable_code_not_in_execute_path",
       "impact_statement": "This issue requires libxml2's Python bindings. The Worker SBOM contains the libxml2 shared library but no python3-libxml2 package, Python libxml2 module, or lxml component; the application requirements also contain no libxml2 Python binding. The vulnerable SAX binding callback is therefore not present in the deployed image."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-125208"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavcodec61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavdevice61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavfilter10@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavformat61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavutil59@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libpostproc58@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswresample5@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswscale8@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The vulnerable V4L2 M2M output encoder is never selected. The renderer's output command explicitly selects the software libx264 encoder for video and AAC for audio; users cannot choose an output encoder or supply a custom output codec. A regression test asserts the render plan pins -c:v to libx264 and excludes v4l2m2m."
     }
   ]
 }
