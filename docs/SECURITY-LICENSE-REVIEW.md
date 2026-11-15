@@ -76,3 +76,11 @@ Build-stage components such as esbuild and `golang.org/x/sys` require version-sp
 ## Base-distribution policy
 
 Debian Forky is still the testing distribution as of 2026-11-15 and is not managed by the Debian security team for timely security updates. Do not switch the production runtime to Forky simply to reduce Trivy counts. Prefer supported Trixie security updates, reviewed backports, or a separately maintained and provenance-verified runtime build.
+
+
+## Debian package attack-surface reductions
+
+- The shared runtime base purges ncurses-bin so the vulnerable infocmp executable is not shipped.
+- CI verifies Archive::Tar is not importable from the installed minimal Perl runtime.
+- CI verifies systemd-homed binaries are absent; the containers use the static EDITFLOW account rather than homed-managed users.
+- Exact package PURLs are recorded in OpenVEX as not_affected only for these runtime images. The statements must be removed if the relevant code becomes present or reachable.
