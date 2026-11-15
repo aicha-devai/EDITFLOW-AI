@@ -7,7 +7,7 @@
 ## Executive findings
 
 1. The last completed pre-isolation container scan (CI run #484) failed the API image vulnerability gate. The web image scan passed at the HIGH/CRITICAL threshold used by that older workflow. PostgreSQL/media tests passed. That run is not evidence that the current images are clean.
-2. The API and media worker have now been split into separate Docker build targets. The API target excludes the FFmpeg/FFprobe executables and the PySceneDetect/OpenCV media-analysis dependencies. The worker target alone installs `requirements-worker.txt`, FFmpeg, and FFprobe.
+2. The API and media worker have now been split into separate Docker build targets. The API target excludes the FFmpeg/FFprobe executables. The worker uses only the restricted system FFmpeg/FFprobe toolchain; scene detection no longer uses a separate OpenCV-bundled FFmpeg stack.
 3. The web Nginx runtime now runs as UID 101 on unprivileged port 8080. The Python API and worker targets run as UID/GID 10001.
 4. The production Compose topology now applies read-only root filesystems, drops all Linux capabilities from API/worker/web, enables `no-new-privileges`, mounts bounded writable tmpfs paths, and sets PID/CPU/memory limits. API and worker use separate egress networks; the worker is not attached to the public ingress network. The proxy is digest-pinned and retains only `NET_BIND_SERVICE`.
 5. CI now generates separate SBOMs for API, worker, and web runtime images. Trivy scans all three at every severity (`UNKNOWN, LOW, MEDIUM, HIGH, CRITICAL`), includes unfixed findings, and fails the gate on any known vulnerability or scan error. The JSON reports are retained even when the gate fails.
@@ -37,10 +37,6 @@ References:
 
 The observed Debian FFmpeg build configuration includes `--enable-gpl`, `--enable-libx264`, `--enable-libx265`, and `--enable-libxvid`. Treat this build as GPL-enabled, not LGPL-only. Preserve the exact Debian copyright files, build configuration, and worker SBOM with every release artifact. The project owner/legal reviewer must determine whether the deployment model distributes the worker image or binaries to customers and what corresponding-source and notice obligations apply.
 
-### OpenCV bundled FFmpeg
-
-`scenedetect-headless` is installed only in the worker image through `apps/api/requirements-worker.txt`. Its OpenCV headless wheel bundles its own FFmpeg libraries, distinct from the Debian FFmpeg executable. Verify the exact wheel version and upstream license notice in every release SBOM.
-
 ### Python and Node runtimes
 
 - Python 3.12.16: PSF-2.0.
@@ -68,3 +64,10 @@ Build-stage components such as esbuild and `golang.org/x/sys` require version-sp
 - Production deployment is tested separately with real TLS, managed PostgreSQL, S3 permissions, backups, monitoring, and incident-response procedures.
 
 **No production-readiness claim is authorized by this document.**
+
+
+## Parser-path containment update
+
+- Removed the OpenCV/PySceneDetect media reader from the worker dependency set. Scene detection now invokes the system FFmpeg executable with the same protocol, demuxer, codec, allocation, and probe restrictions as other source reads.
+- Added an ISO-BMFF atom-header preflight before ffprobe. It rejects all PSSH atoms because DRM-protected uploads are not a product requirement; the check reads atom headers only and does not parse media payloads.
+- These are containment controls, not a patched Debian FFmpeg package. CVE-2026-107678 remains a release blocker until a patched binary and adversarial regression evidence are available.
