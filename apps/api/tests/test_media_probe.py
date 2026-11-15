@@ -108,3 +108,35 @@ async def test_probe_media_rejects_hdr_and_webm_video_codecs(monkeypatch, codec)
     monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_create)
     with pytest.raises(MediaProbeError, match="Unsupported video codec"):
         await probe_media("/media/source.mp4")
+
+def _mp4_box(kind: bytes, payload: bytes = b"") -> bytes:
+    return struct.pack(">I4s", 8 + len(payload), kind) + payload
+
+
+@pytest.mark.asyncio
+async def test_probe_rejects_pssh_before_invoking_ffprobe(tmp_path, monkeypatch):
+    source = tmp_path / "drm.mp4"
+    source.write_bytes(
+        _mp4_box(b"ftyp", b"isom0000")
+        + _mp4_box(b"moov", _mp4_box(b"pssh", b"\\x00\\x00\\x00\\x00"))
+    )
+
+    async def parser_must_not_run(*_args, **_kwargs):
+        raise AssertionError("ffprobe must not run for PSSH-containing media")
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", parser_must_not_run)
+    with pytest.raises(MediaProbeError, match="PSSH atoms are not supported"):
+        await probe_media(str(source))
+
+
+@pytest.mark.asyncio
+async def test_probe_rejects_top_level_pssh_before_invoking_ffprobe(tmp_path, monkeypatch):
+    source = tmp_path / "top-level-pssh.mp4"
+    source.write_bytes(_mp4_box(b"ftyp", b"isom0000") + _mp4_box(b"pssh", b"\\x00\\x00\\x00\\x00"))
+
+    async def parser_must_not_run(*_args, **_kwargs):
+        raise AssertionError("ffprobe must not run for PSSH-containing media")
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", parser_must_not_run)
+    with pytest.raises(MediaProbeError, match="PSSH atoms are not supported"):
+        await probe_media(str(source))
