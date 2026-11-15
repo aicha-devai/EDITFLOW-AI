@@ -180,7 +180,7 @@ def test_render_input_arguments_reject_pssh_before_ffmpeg_receives_the_source(tm
     source = tmp_path / "render-drm.mp4"
     source.write_bytes(
         _mp4_box(b"ftyp", b"isom0000")
-        + _mp4_box(b"moov", _mp4_box(b"pssh", b"\\x00\\x00\\x00\\x00"))
+        + _mp4_box(b"moov", _mp4_box(b"pssh", b"\x00\x00\x00\x00"))
     )
     with pytest.raises(MediaInputPolicyError, match="PSSH atoms are not supported"):
         media_input_args(str(source))
