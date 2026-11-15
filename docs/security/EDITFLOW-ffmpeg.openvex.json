@@ -2,8 +2,8 @@
   "@context": "https://openvex.dev/ns/v0.2.0",
   "@id": "https://github.com/aicha-devai/EDITFLOW-AI/security/vex/ffmpeg-triage-2026-11-13",
   "author": "EDITFLOW Security Review",
-  "timestamp": "2026-11-15T18:58:00Z",
-  "version": 10,
+  "timestamp": "2026-11-15T19:04:00Z",
+  "version": 11,
   "statements": [
     {
       "vulnerability": {
@@ -1761,6 +1761,314 @@
       "status": "not_affected",
       "justification": "vulnerable_code_not_in_execute_path",
       "impact_statement": "The vulnerable restricted bind-mount path requires the privileged mount(8) executable to process an fstab entry with X-mount.owner/group/mode. The Worker and API images delete the mount and umount executables after package installation; CI asserts that neither command is present in either final image. The application does not invoke mount operations."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-107364"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/libgssapi-krb5-2@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libk5crypto3@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libkrb5-3@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libkrb5support0@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The affected code paths are Kerberos KDC/kadmind server operations (KDC ASN.1 request processing, KDB/KDC operations, or kadmind GSS-RPC administrative services). The Worker image contains only the client-side Kerberos shared libraries as transitive dependencies; it does not contain or run krb5kdc, kadmind, kadmin, kadmin.local, or kdb5_util. The application does not implement a Kerberos KDC or administrative service. FFmpeg source media is restricted to file and pipe protocols, so it cannot expose these server RPC endpoints. CI asserts the KDC/admin executables are absent and a regression test locks the media protocol allowlist to file,pipe. Reassess if Kerberos server packages or network media protocols are added."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-112315"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/libgssapi-krb5-2@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libk5crypto3@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libkrb5-3@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libkrb5support0@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The affected code paths are Kerberos KDC/kadmind server operations (KDC ASN.1 request processing, KDB/KDC operations, or kadmind GSS-RPC administrative services). The Worker image contains only the client-side Kerberos shared libraries as transitive dependencies; it does not contain or run krb5kdc, kadmind, kadmin, kadmin.local, or kdb5_util. The application does not implement a Kerberos KDC or administrative service. FFmpeg source media is restricted to file and pipe protocols, so it cannot expose these server RPC endpoints. CI asserts the KDC/admin executables are absent and a regression test locks the media protocol allowlist to file,pipe. Reassess if Kerberos server packages or network media protocols are added."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-112316"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/libgssapi-krb5-2@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libk5crypto3@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libkrb5-3@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libkrb5support0@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The affected code paths are Kerberos KDC/kadmind server operations (KDC ASN.1 request processing, KDB/KDC operations, or kadmind GSS-RPC administrative services). The Worker image contains only the client-side Kerberos shared libraries as transitive dependencies; it does not contain or run krb5kdc, kadmind, kadmin, kadmin.local, or kdb5_util. The application does not implement a Kerberos KDC or administrative service. FFmpeg source media is restricted to file and pipe protocols, so it cannot expose these server RPC endpoints. CI asserts the KDC/admin executables are absent and a regression test locks the media protocol allowlist to file,pipe. Reassess if Kerberos server packages or network media protocols are added."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-112317"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/libgssapi-krb5-2@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libk5crypto3@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libkrb5-3@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libkrb5support0@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The affected code paths are Kerberos KDC/kadmind server operations (KDC ASN.1 request processing, KDB/KDC operations, or kadmind GSS-RPC administrative services). The Worker image contains only the client-side Kerberos shared libraries as transitive dependencies; it does not contain or run krb5kdc, kadmind, kadmin, kadmin.local, or kdb5_util. The application does not implement a Kerberos KDC or administrative service. FFmpeg source media is restricted to file and pipe protocols, so it cannot expose these server RPC endpoints. CI asserts the KDC/admin executables are absent and a regression test locks the media protocol allowlist to file,pipe. Reassess if Kerberos server packages or network media protocols are added."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-112318"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/libgssapi-krb5-2@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libk5crypto3@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libkrb5-3@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libkrb5support0@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The affected code paths are Kerberos KDC/kadmind server operations (KDC ASN.1 request processing, KDB/KDC operations, or kadmind GSS-RPC administrative services). The Worker image contains only the client-side Kerberos shared libraries as transitive dependencies; it does not contain or run krb5kdc, kadmind, kadmin, kadmin.local, or kdb5_util. The application does not implement a Kerberos KDC or administrative service. FFmpeg source media is restricted to file and pipe protocols, so it cannot expose these server RPC endpoints. CI asserts the KDC/admin executables are absent and a regression test locks the media protocol allowlist to file,pipe. Reassess if Kerberos server packages or network media protocols are added."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-112319"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/libgssapi-krb5-2@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libk5crypto3@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libkrb5-3@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libkrb5support0@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The affected code paths are Kerberos KDC/kadmind server operations (KDC ASN.1 request processing, KDB/KDC operations, or kadmind GSS-RPC administrative services). The Worker image contains only the client-side Kerberos shared libraries as transitive dependencies; it does not contain or run krb5kdc, kadmind, kadmin, kadmin.local, or kdb5_util. The application does not implement a Kerberos KDC or administrative service. FFmpeg source media is restricted to file and pipe protocols, so it cannot expose these server RPC endpoints. CI asserts the KDC/admin executables are absent and a regression test locks the media protocol allowlist to file,pipe. Reassess if Kerberos server packages or network media protocols are added."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-112320"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/libgssapi-krb5-2@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libk5crypto3@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libkrb5-3@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libkrb5support0@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The affected code paths are Kerberos KDC/kadmind server operations (KDC ASN.1 request processing, KDB/KDC operations, or kadmind GSS-RPC administrative services). The Worker image contains only the client-side Kerberos shared libraries as transitive dependencies; it does not contain or run krb5kdc, kadmind, kadmin, kadmin.local, or kdb5_util. The application does not implement a Kerberos KDC or administrative service. FFmpeg source media is restricted to file and pipe protocols, so it cannot expose these server RPC endpoints. CI asserts the KDC/admin executables are absent and a regression test locks the media protocol allowlist to file,pipe. Reassess if Kerberos server packages or network media protocols are added."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-112321"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/libgssapi-krb5-2@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libk5crypto3@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libkrb5-3@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libkrb5support0@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The affected code paths are Kerberos KDC/kadmind server operations (KDC ASN.1 request processing, KDB/KDC operations, or kadmind GSS-RPC administrative services). The Worker image contains only the client-side Kerberos shared libraries as transitive dependencies; it does not contain or run krb5kdc, kadmind, kadmin, kadmin.local, or kdb5_util. The application does not implement a Kerberos KDC or administrative service. FFmpeg source media is restricted to file and pipe protocols, so it cannot expose these server RPC endpoints. CI asserts the KDC/admin executables are absent and a regression test locks the media protocol allowlist to file,pipe. Reassess if Kerberos server packages or network media protocols are added."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-112322"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/libgssapi-krb5-2@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libk5crypto3@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libkrb5-3@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libkrb5support0@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The affected code paths are Kerberos KDC/kadmind server operations (KDC ASN.1 request processing, KDB/KDC operations, or kadmind GSS-RPC administrative services). The Worker image contains only the client-side Kerberos shared libraries as transitive dependencies; it does not contain or run krb5kdc, kadmind, kadmin, kadmin.local, or kdb5_util. The application does not implement a Kerberos KDC or administrative service. FFmpeg source media is restricted to file and pipe protocols, so it cannot expose these server RPC endpoints. CI asserts the KDC/admin executables are absent and a regression test locks the media protocol allowlist to file,pipe. Reassess if Kerberos server packages or network media protocols are added."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-112323"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/libgssapi-krb5-2@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libk5crypto3@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libkrb5-3@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libkrb5support0@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The affected code paths are Kerberos KDC/kadmind server operations (KDC ASN.1 request processing, KDB/KDC operations, or kadmind GSS-RPC administrative services). The Worker image contains only the client-side Kerberos shared libraries as transitive dependencies; it does not contain or run krb5kdc, kadmind, kadmin, kadmin.local, or kdb5_util. The application does not implement a Kerberos KDC or administrative service. FFmpeg source media is restricted to file and pipe protocols, so it cannot expose these server RPC endpoints. CI asserts the KDC/admin executables are absent and a regression test locks the media protocol allowlist to file,pipe. Reassess if Kerberos server packages or network media protocols are added."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-118380"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/libgssapi-krb5-2@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libk5crypto3@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libkrb5-3@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libkrb5support0@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The affected code paths are Kerberos KDC/kadmind server operations (KDC ASN.1 request processing, KDB/KDC operations, or kadmind GSS-RPC administrative services). The Worker image contains only the client-side Kerberos shared libraries as transitive dependencies; it does not contain or run krb5kdc, kadmind, kadmin, kadmin.local, or kdb5_util. The application does not implement a Kerberos KDC or administrative service. FFmpeg source media is restricted to file and pipe protocols, so it cannot expose these server RPC endpoints. CI asserts the KDC/admin executables are absent and a regression test locks the media protocol allowlist to file,pipe. Reassess if Kerberos server packages or network media protocols are added."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-119079"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/libgssapi-krb5-2@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libk5crypto3@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libkrb5-3@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libkrb5support0@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The affected code paths are Kerberos KDC/kadmind server operations (KDC ASN.1 request processing, KDB/KDC operations, or kadmind GSS-RPC administrative services). The Worker image contains only the client-side Kerberos shared libraries as transitive dependencies; it does not contain or run krb5kdc, kadmind, kadmin, kadmin.local, or kdb5_util. The application does not implement a Kerberos KDC or administrative service. FFmpeg source media is restricted to file and pipe protocols, so it cannot expose these server RPC endpoints. CI asserts the KDC/admin executables are absent and a regression test locks the media protocol allowlist to file,pipe. Reassess if Kerberos server packages or network media protocols are added."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-71199"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/libgssapi-krb5-2@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libk5crypto3@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libkrb5-3@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libkrb5support0@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The affected code paths are Kerberos KDC/kadmind server operations (KDC ASN.1 request processing, KDB/KDC operations, or kadmind GSS-RPC administrative services). The Worker image contains only the client-side Kerberos shared libraries as transitive dependencies; it does not contain or run krb5kdc, kadmind, kadmin, kadmin.local, or kdb5_util. The application does not implement a Kerberos KDC or administrative service. FFmpeg source media is restricted to file and pipe protocols, so it cannot expose these server RPC endpoints. CI asserts the KDC/admin executables are absent and a regression test locks the media protocol allowlist to file,pipe. Reassess if Kerberos server packages or network media protocols are added."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-71200"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/libgssapi-krb5-2@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libk5crypto3@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libkrb5-3@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libkrb5support0@1.21.3-5%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The affected code paths are Kerberos KDC/kadmind server operations (KDC ASN.1 request processing, KDB/KDC operations, or kadmind GSS-RPC administrative services). The Worker image contains only the client-side Kerberos shared libraries as transitive dependencies; it does not contain or run krb5kdc, kadmind, kadmin, kadmin.local, or kdb5_util. The application does not implement a Kerberos KDC or administrative service. FFmpeg source media is restricted to file and pipe protocols, so it cannot expose these server RPC endpoints. CI asserts the KDC/admin executables are absent and a regression test locks the media protocol allowlist to file,pipe. Reassess if Kerberos server packages or network media protocols are added."
     }
   ]
 }
