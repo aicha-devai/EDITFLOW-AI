@@ -124,7 +124,7 @@ async def test_worker_fails_job_and_does_not_publish_invalid_output(db_session, 
     storage = LocalObjectStorage(tmp_path / "invalid-objects")
     source = storage.root / "uploads" / "source.mp4"
     source.parent.mkdir(parents=True)
-    source.write_bytes(b"fake-media")
+    source.write_bytes(_minimal_mp4_atom_table())
 
     async def fake_probe(path):
         if str(path).endswith("render.mp4"):
