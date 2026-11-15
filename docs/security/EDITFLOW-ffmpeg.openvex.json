@@ -2,8 +2,8 @@
   "@context": "https://openvex.dev/ns/v0.2.0",
   "@id": "https://github.com/aicha-devai/EDITFLOW-AI/security/vex/ffmpeg-triage-2026-11-13",
   "author": "EDITFLOW Security Review",
-  "timestamp": "2026-11-15T18:40:00Z",
-  "version": 6,
+  "timestamp": "2026-11-15T18:43:00Z",
+  "version": 7,
   "statements": [
     {
       "vulnerability": {
@@ -631,16 +631,16 @@
       },
       "products": [
         {
-          "@id": "pkg:deb/debian/libncursesw6@6.5%2B20250216-2?arch=amd64&distro=debian-13.7"
+          "@id": "pkg:deb/debian/libncursesw6@6.5%2B20250216-2?arch=amd64&distro=debian-13&upstream=ncurses"
         },
         {
-          "@id": "pkg:deb/debian/libtinfo6@6.5%2B20250216-2?arch=amd64&distro=debian-13.7"
+          "@id": "pkg:deb/debian/libtinfo6@6.5%2B20250216-2?arch=amd64&distro=debian-13&upstream=ncurses"
         },
         {
-          "@id": "pkg:deb/debian/ncurses-base@6.5%2B20250216-2?arch=all&distro=debian-13.7"
+          "@id": "pkg:deb/debian/ncurses-base@6.5%2B20250216-2?arch=all&distro=debian-13&upstream=ncurses"
         },
         {
-          "@id": "pkg:deb/debian/ncurses-bin@6.5%2B20250216-2?arch=amd64&distro=debian-13.7"
+          "@id": "pkg:deb/debian/ncurses-bin@6.5%2B20250216-2?arch=amd64&distro=debian-13&upstream=ncurses"
         }
       ],
       "status": "not_affected",
@@ -653,7 +653,7 @@
       },
       "products": [
         {
-          "@id": "pkg:deb/debian/perl-base@5.40.1-6%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+          "@id": "pkg:deb/debian/perl-base@5.40.1-6%2Bdeb13u1?arch=amd64&distro=debian-13&upstream=perl"
         }
       ],
       "status": "not_affected",
@@ -666,10 +666,10 @@
       },
       "products": [
         {
-          "@id": "pkg:deb/debian/libsystemd0@257.13-1~deb13u1?arch=amd64&distro=debian-13.7"
+          "@id": "pkg:deb/debian/libsystemd0@257.13-1~deb13u1?arch=amd64&distro=debian-13&upstream=systemd"
         },
         {
-          "@id": "pkg:deb/debian/libudev1@257.13-1~deb13u1?arch=amd64&distro=debian-13.7"
+          "@id": "pkg:deb/debian/libudev1@257.13-1~deb13u1?arch=amd64&distro=debian-13&upstream=systemd"
         }
       ],
       "status": "not_affected",
