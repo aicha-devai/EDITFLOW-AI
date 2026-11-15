@@ -97,7 +97,7 @@ def test_ffmpeg_plan_rejects_drm_pssh_source_as_a_validation_error(tmp_path):
 
     source.write_bytes(
         box(b"ftyp", b"isom0000")
-        + box(b"moov", box(b"pssh", b"\\x00\\x00\\x00\\x00"))
+        + box(b"moov", box(b"pssh", b"\x00\x00\x00\x00"))
     )
     with pytest.raises(RenderPlanError, match="PSSH atoms are not supported"):
         build_ffmpeg_plan(
