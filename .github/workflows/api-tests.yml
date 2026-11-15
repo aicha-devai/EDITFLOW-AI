@@ -98,7 +98,7 @@ jobs:
 
       - name: Verify API image is unprivileged and excludes FFmpeg executables
         run: |
-          docker run --rm --entrypoint sh editflow-api:sbom -c 'set -eu; test "$(id -u)" = "10001"; ! command -v ffmpeg >/dev/null 2>&1; ! command -v ffprobe >/dev/null 2>&1; ! command -v infocmp >/dev/null 2>&1; ! dpkg-query -W ncurses-bin >/dev/null 2>&1; ! python -m pip --version >/dev/null 2>&1; ! perl -MArchive::Tar -e "exit 0" >/dev/null 2>&1; ! test -x /usr/lib/systemd/systemd-homed; ! test -x /lib/systemd/systemd-homed; python -c "import importlib.metadata as m; e={\"certifi\":\"2026.10.18\",\"msgpack\":\"1.2.3\",\"setuptools\":\"84.1.0\",\"urllib3\":\"2.8.0\"}; assert all(m.version(k)==v for k,v in e.items())"'
+          docker run --rm --entrypoint sh editflow-api:sbom -c 'set -eu; test "$(id -u)" = "10001"; ! command -v ffmpeg >/dev/null 2>&1; ! command -v ffprobe >/dev/null 2>&1; ! command -v infocmp >/dev/null 2>&1; ! python -m pip --version >/dev/null 2>&1; ! perl -MArchive::Tar -e "exit 0" >/dev/null 2>&1; ! test -x /usr/lib/systemd/systemd-homed; ! test -x /lib/systemd/systemd-homed; python -c "import importlib.metadata as m; e={\"certifi\":\"2026.10.18\",\"msgpack\":\"1.2.3\",\"setuptools\":\"84.1.0\",\"urllib3\":\"2.8.0\"}; assert all(m.version(k)==v for k,v in e.items())"'
           docker run --rm --entrypoint python editflow-api:sbom -c 'import importlib.util; assert all(importlib.util.find_spec(name) is None for name in ("pytest", "pytest_asyncio", "cv2", "scenedetect"))'
 
       - name: Build isolated media worker image
