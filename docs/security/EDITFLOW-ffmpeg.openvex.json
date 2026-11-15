@@ -2,8 +2,8 @@
   "@context": "https://openvex.dev/ns/v0.2.0",
   "@id": "https://github.com/aicha-devai/EDITFLOW-AI/security/vex/ffmpeg-triage-2026-11-13",
   "author": "EDITFLOW Security Review",
-  "timestamp": "2026-11-15T14:20:00Z",
-  "version": 2,
+  "timestamp": "2026-11-15T14:30:00Z",
+  "version": 3,
   "statements": [
     {
       "vulnerability": {
@@ -624,6 +624,54 @@
       "status": "not_affected",
       "justification": "vulnerable_code_not_in_execute_path",
       "impact_statement": "Before ffprobe runs, the worker parses ISO-BMFF atom headers and rejects PSSH atoms. Every FFmpeg source input also passes through media_input_args(), which performs the same rejection before adding -i. The parser covers top-level atoms and direct moov/moof children, handles 32-bit, extended-size, and size-to-end headers, and fails closed on malformed tables or excessive atom counts. Regression tests cover top-level and moov PSSH atoms, extended-size PSSH, malformed atom sizes, and the render input boundary. DRM-protected inputs are not supported. This is an application-level input exclusion, not a patched FFmpeg package."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2025-69720"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/libncursesw6@6.5%2B20250216-2?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libtinfo6@6.5%2B20250216-2?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/ncurses-base@6.5%2B20250216-2?arch=all&distro=debian-13.7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The vulnerable code is in the infocmp command-line executable. The runtime image purges ncurses-bin and CI verifies that the package and infocmp executable are absent. The remaining ncurses runtime libraries/terminfo data do not provide the vulnerable infocmp program."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-9538"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/perl-base@5.40.1-6%2Bdeb13u1?arch=amd64&distro=debian-13.7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The vulnerable Archive::Tar module is not installed in either runtime image. CI verifies that Perl cannot load Archive::Tar; only the minimal perl-base runtime remains. The application does not parse untrusted tar archives through Perl."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-16742"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/libsystemd0@257.13-1~deb13u1?arch=amd64&distro=debian-13.7"
+        },
+        {
+          "@id": "pkg:deb/debian/libudev1@257.13-1~deb13u1?arch=amd64&distro=debian-13.7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The vulnerability is in the systemd-homed account-management daemon. Neither systemd-homed executable nor service is installed in the runtime images; EDITFLOW uses a static /etc/passwd account and does not configure the systemd NSS module. CI verifies the homed executables are absent."
     }
   ]
 }
