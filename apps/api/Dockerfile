@@ -49,6 +49,10 @@ RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends ffmpeg=7:7.1.5-0+deb13u1; \
     test "$(dpkg-query -W -f='${Version}' ffmpeg)" = "7:7.1.5-0+deb13u1"; \
+    for name in mount umount nsenter; do path="$(command -v "$name" || true)"; if [ -n "$path" ]; then rm -f "$path"; fi; done; \
+    ! command -v mount >/dev/null 2>&1; \
+    ! command -v umount >/dev/null 2>&1; \
+    ! command -v nsenter >/dev/null 2>&1; \
     rm -rf /var/lib/apt/lists/*
 USER 10001:10001
 CMD ["python", "-m", "app.worker_main"]
@@ -57,6 +61,11 @@ CMD ["python", "-m", "app.worker_main"]
 # the FFmpeg/FFprobe command-line tools used only by the isolated worker.
 FROM runtime-base AS api
 RUN python -m pip uninstall -y pip
+RUN set -eux; \
+    for name in mount umount nsenter; do path="$(command -v "$name" || true)"; if [ -n "$path" ]; then rm -f "$path"; fi; done; \
+    ! command -v mount >/dev/null 2>&1; \
+    ! command -v umount >/dev/null 2>&1; \
+    ! command -v nsenter >/dev/null 2>&1
 USER 10001:10001
 EXPOSE 8000
 CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
