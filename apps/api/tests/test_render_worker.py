@@ -1,3 +1,4 @@
+import struct
 import uuid
 from types import SimpleNamespace
 
@@ -9,6 +10,13 @@ from app.schemas import TimelineDocument
 from app.storage import LocalObjectStorage
 from app.versioning import save_timeline
 from app.render_worker import render_claimed_job
+
+
+def _minimal_mp4_atom_table():
+    return (
+        struct.pack(">I4s", 16, b"ftyp") + b"isom0000"
+        + struct.pack(">I4s", 8, b"moov")
+    )
 
 
 @pytest.mark.asyncio
@@ -35,7 +43,7 @@ async def test_worker_renders_pinned_snapshot_and_stores_output(db_session, tmp_
     storage = LocalObjectStorage(tmp_path / "objects")
     source = storage.root / "uploads" / "source.mp4"
     source.parent.mkdir(parents=True)
-    source.write_bytes(b"fake-media")
+    source.write_bytes(_minimal_mp4_atom_table())
 
     async def fake_probe(path):
         if str(path).endswith("render.mp4"):
