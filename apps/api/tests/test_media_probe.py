@@ -141,3 +141,35 @@ async def test_probe_rejects_top_level_pssh_before_invoking_ffprobe(tmp_path, mo
     monkeypatch.setattr(asyncio, "create_subprocess_exec", parser_must_not_run)
     with pytest.raises(MediaProbeError, match="PSSH atoms are not supported"):
         await probe_media(str(source))
+
+def _mp4_box_extended(kind: bytes, payload: bytes = b"") -> bytes:
+    return struct.pack(">I4sQ", 1, kind, 16 + len(payload)) + payload
+
+
+@pytest.mark.asyncio
+async def test_probe_rejects_extended_size_pssh_before_invoking_ffprobe(tmp_path, monkeypatch):
+    source = tmp_path / "extended-pssh.mp4"
+    source.write_bytes(
+        _mp4_box(b"ftyp", b"isom0000")
+        + _mp4_box(b"moov", _mp4_box_extended(b"pssh", b"\\x00\\x00\\x00\\x00"))
+    )
+
+    async def parser_must_not_run(*_args, **_kwargs):
+        raise AssertionError("ffprobe must not run for extended-size PSSH media")
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", parser_must_not_run)
+    with pytest.raises(MediaProbeError, match="PSSH atoms are not supported"):
+        await probe_media(str(source))
+
+
+@pytest.mark.asyncio
+async def test_probe_fails_closed_on_malformed_atom_header(tmp_path, monkeypatch):
+    source = tmp_path / "malformed.mp4"
+    source.write_bytes(struct.pack(">I4s", 4, b"ftyp"))
+
+    async def parser_must_not_run(*_args, **_kwargs):
+        raise AssertionError("ffprobe must not run for malformed atom tables")
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", parser_must_not_run)
+    with pytest.raises(MediaProbeError, match="Invalid MP4 atom size"):
+        await probe_media(str(source))
