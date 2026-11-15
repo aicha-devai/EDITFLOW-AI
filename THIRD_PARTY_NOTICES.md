@@ -48,8 +48,6 @@ These repositories were inspected for architectural ideas only. EDITFLOW AI does
 ### Licensing evidence
 
 - FFmpeg legal/licensing guidance: https://www.ffmpeg.org/legal.html
-- OpenCV-Python wheel licensing statement (including bundled FFmpeg LGPLv2.1): https://github.com/opencv/opencv-python#licensing
-- OpenCV licensing (Apache-2.0 for OpenCV 4.5.0+): https://opencv.org/license/
 
 ## Web container and JavaScript dependency scope
 
@@ -78,7 +76,7 @@ The inventory below was manually reconciled against upstream license texts where
 
 ### Runtime separation and container hardening
 
-- The Dockerfile now has separate `api` and `worker` targets. The API target excludes the FFmpeg/FFprobe executables and PySceneDetect/OpenCV dependencies; only the isolated worker target installs `requirements-worker.txt` and the media toolchain.
+- The Dockerfile now has separate `api` and `worker` targets. The API target excludes the FFmpeg/FFprobe executables. The worker installs only the system FFmpeg/FFprobe media toolchain; no Python media-reader wheel or bundled FFmpeg copy is installed.
 - Both Python runtime targets run as UID/GID 10001, not root.
 - The production Compose topology sets read-only root filesystems, drops Linux capabilities, enables `no-new-privileges`, uses bounded writable tmpfs mounts, and applies PID/CPU/memory limits.
 - The worker receives only database, object-storage, and optional evidence-extraction credentials; SMTP credentials and the API authentication secret are not inherited by the worker.
