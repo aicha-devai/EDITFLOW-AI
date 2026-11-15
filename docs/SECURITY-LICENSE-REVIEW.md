@@ -71,3 +71,8 @@ Build-stage components such as esbuild and `golang.org/x/sys` require version-sp
 - Removed the OpenCV/PySceneDetect media reader from the worker dependency set. Scene detection now invokes the system FFmpeg executable with the same protocol, demuxer, codec, allocation, and probe restrictions as other source reads.
 - Added an ISO-BMFF atom-header preflight before ffprobe. It rejects all PSSH atoms because DRM-protected uploads are not a product requirement; the check reads atom headers only and does not parse media payloads.
 - These are containment controls, not a patched Debian FFmpeg package. CVE-2026-107678 remains a release blocker until a patched binary and adversarial regression evidence are available.
+
+
+## Base-distribution policy
+
+Debian Forky is still the testing distribution as of 2026-11-15 and is not managed by the Debian security team for timely security updates. Do not switch the production runtime to Forky simply to reduce Trivy counts. Prefer supported Trixie security updates, reviewed backports, or a separately maintained and provenance-verified runtime build.
