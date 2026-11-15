@@ -15,7 +15,7 @@
 
 ## Media-processing risk: unresolved release blocker
 
-The worker still uses Debian FFmpeg `7:7.1.5-0+deb13u1` and the OpenCV wheel's bundled FFmpeg libraries. Debian's tracker currently marks the Trixie FFmpeg package vulnerable to multiple CVEs, including CVE-2026-75143. The newer Debian Forky FFmpeg package fixes that specific issue, but the tracker also lists later vulnerabilities affecting releases through FFmpeg 9.0.2. Blindly upgrading the version or changing distributions is therefore not proof of a clean media stack.
+The worker still uses Debian FFmpeg `7:7.1.5-0+deb13u1`. This branch removes the OpenCV/PySceneDetect wheel and routes scene detection through the system FFmpeg binary; CI must confirm that no `cv2` or `scenedetect` modules remain. Debian's tracker currently marks the Trixie FFmpeg package vulnerable to multiple CVEs, including CVE-2026-75143. The newer Debian Forky FFmpeg package fixes that specific issue, but the tracker also lists later vulnerabilities affecting releases through FFmpeg 9.0.2. Blindly upgrading the version or changing distributions is therefore not proof of a clean media stack.
 
 Required next work:
 - Review each worker Trivy finding against the Debian and upstream FFmpeg trackers.
