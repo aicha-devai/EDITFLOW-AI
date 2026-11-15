@@ -2,8 +2,8 @@
   "@context": "https://openvex.dev/ns/v0.2.0",
   "@id": "https://github.com/aicha-devai/EDITFLOW-AI/security/vex/ffmpeg-triage-2026-11-13",
   "author": "EDITFLOW Security Review",
-  "timestamp": "2026-11-13T14:42:00Z",
-  "version": 1,
+  "timestamp": "2026-11-15T14:20:00Z",
+  "version": 2,
   "statements": [
     {
       "vulnerability": {
@@ -16,7 +16,7 @@
       ],
       "status": "not_affected",
       "justification": "vulnerable_code_not_in_execute_path",
-      "impact_statement": "RASC is not in the explicit decoder allowlist; only h264, hevc, vp8, vp9, av1, prores, mpeg4 and mjpeg video decoders are accepted."
+      "impact_statement": "RASC is not in the explicit decoder allowlist; only h264, prores, mpeg4 and mjpeg video decoders are accepted."
     },
     {
       "vulnerability": {
@@ -29,7 +29,7 @@
       ],
       "status": "not_affected",
       "justification": "vulnerable_code_not_in_execute_path",
-      "impact_statement": "The VobSub .sub/.idx demuxer is outside the mov,matroska format allowlist; subtitle codecs are not in the decoder allowlist."
+      "impact_statement": "The VobSub .sub/.idx demuxer is outside the mov format allowlist; subtitle codecs are not in the decoder allowlist."
     },
     {
       "vulnerability": {
@@ -68,7 +68,7 @@
       ],
       "status": "not_affected",
       "justification": "vulnerable_code_not_in_execute_path",
-      "impact_statement": "RTP/ASF demuxing is not allowed: input protocols are restricted to file,pipe and demuxers to mov,matroska."
+      "impact_statement": "RTP/ASF demuxing is not allowed: input protocols are restricted to file,pipe and demuxers to mov."
     },
     {
       "vulnerability": {
@@ -81,7 +81,7 @@
       ],
       "status": "not_affected",
       "justification": "vulnerable_code_not_in_execute_path",
-      "impact_statement": "ADX/AAX codecs are not in the explicit decoder allowlist; the accepted audio codecs are AAC, MP3, Opus, Vorbis, PCM, ALAC, AC3, EAC3 and FLAC."
+      "impact_statement": "ADX/AAX codecs are not in the explicit decoder allowlist; the accepted audio codecs are AAC, MP3, PCM, ALAC, AC3, EAC3 and FLAC."
     },
     {
       "vulnerability": {
@@ -107,7 +107,7 @@
       ],
       "status": "not_affected",
       "justification": "vulnerable_code_not_in_execute_path",
-      "impact_statement": "CAF is outside the mov,matroska demuxer allowlist and MACE6 is not in the decoder allowlist."
+      "impact_statement": "CAF is outside the mov demuxer allowlist and MACE6 is not in the decoder allowlist."
     },
     {
       "vulnerability": {
@@ -146,7 +146,7 @@
       ],
       "status": "not_affected",
       "justification": "vulnerable_code_not_in_execute_path",
-      "impact_statement": "WTV is outside the mov,matroska demuxer allowlist and DVB subtitle codecs are not accepted."
+      "impact_statement": "WTV is outside the mov demuxer allowlist and DVB subtitle codecs are not accepted."
     },
     {
       "vulnerability": {
@@ -172,7 +172,7 @@
       ],
       "status": "not_affected",
       "justification": "vulnerable_code_not_in_execute_path",
-      "impact_statement": "HEVC may be decoded as input, but the renderer always decodes and re-encodes video with libx264; it never stream-copies or muxes HEVC/hvcC output."
+      "impact_statement": "HEVC is excluded from the input codec allowlist; the renderer always decodes and re-encodes accepted video with libx264."
     },
     {
       "vulnerability": {
@@ -224,7 +224,7 @@
       ],
       "status": "not_affected",
       "justification": "vulnerable_code_not_in_execute_path",
-      "impact_statement": "DASH is excluded by the mov,matroska demuxer allowlist and network protocols are not permitted."
+      "impact_statement": "DASH is excluded by the mov demuxer allowlist and network protocols are not permitted."
     },
     {
       "vulnerability": {
@@ -263,7 +263,7 @@
       ],
       "status": "not_affected",
       "justification": "vulnerable_code_not_in_execute_path",
-      "impact_statement": "DASH is not in the mov,matroska demuxer allowlist; the worker does not open manifests or network streams."
+      "impact_statement": "DASH is not in the mov demuxer allowlist; the worker does not open manifests or network streams."
     },
     {
       "vulnerability": {
@@ -276,7 +276,7 @@
       ],
       "status": "not_affected",
       "justification": "vulnerable_code_not_in_execute_path",
-      "impact_statement": "HLS is not in the mov,matroska demuxer allowlist; playlist inputs are rejected before demuxing."
+      "impact_statement": "HLS is not in the mov demuxer allowlist; playlist inputs are rejected before demuxing."
     },
     {
       "vulnerability": {
@@ -302,7 +302,7 @@
       ],
       "status": "not_affected",
       "justification": "vulnerable_code_not_in_execute_path",
-      "impact_statement": "HLS is not in the mov,matroska demuxer allowlist; HLS child-playlist handling is not reachable."
+      "impact_statement": "HLS is not in the mov demuxer allowlist; HLS child-playlist handling is not reachable."
     },
     {
       "vulnerability": {
@@ -315,7 +315,7 @@
       ],
       "status": "not_affected",
       "justification": "vulnerable_code_not_in_execute_path",
-      "impact_statement": "The IMF demuxer is not in the mov,matroska format allowlist."
+      "impact_statement": "The IMF demuxer is not in the mov format allowlist."
     },
     {
       "vulnerability": {
@@ -445,7 +445,7 @@
       ],
       "status": "not_affected",
       "justification": "vulnerable_code_not_in_execute_path",
-      "impact_statement": "The ffconcat demuxer is not in the mov,matroska allowlist and the renderer never supplies -safe 0 or concat manifests."
+      "impact_statement": "The ffconcat demuxer is not in the mov allowlist and the renderer never supplies -safe 0 or concat manifests."
     },
     {
       "vulnerability": {
@@ -484,7 +484,7 @@
       ],
       "status": "not_affected",
       "justification": "vulnerable_code_not_in_execute_path",
-      "impact_statement": "IAMF is not in the mov,matroska demuxer allowlist."
+      "impact_statement": "IAMF is not in the mov demuxer allowlist."
     },
     {
       "vulnerability": {
@@ -549,7 +549,81 @@
       ],
       "status": "not_affected",
       "justification": "vulnerable_code_not_in_execute_path",
-      "impact_statement": "HLS is not in the mov,matroska demuxer allowlist; the worker does not process HLS playlists."
+      "impact_statement": "HLS is not in the mov demuxer allowlist; the worker does not process HLS playlists."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-107676"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavcodec61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavdevice61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavfilter10@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavformat61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavutil59@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libpostproc58@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswresample5@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswscale8@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "All uploaded-source ffprobe and FFmpeg inputs are constrained by the shared input policy: only the MOV demuxer and H.264, ProRes, MPEG-4 Part 2, and MJPEG video codecs are allowed. Matroska/WebM, HEVC, and AV1 are excluded; the OpenCV/PySceneDetect reader was removed, so no alternate media parser bypasses the allowlist. The reported T.35 BlockAdditional and HEVC/AV1 SEI trigger paths are therefore outside the supported input surface. This is an application-level reachability determination, not a patched FFmpeg package."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-107678"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavcodec61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavdevice61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavfilter10@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavformat61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavutil59@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libpostproc58@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswresample5@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswscale8@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "Before ffprobe runs, the worker parses ISO-BMFF atom headers and rejects PSSH atoms. Every FFmpeg source input also passes through media_input_args(), which performs the same rejection before adding -i. The parser covers top-level atoms and direct moov/moof children, handles 32-bit, extended-size, and size-to-end headers, and fails closed on malformed tables or excessive atom counts. Regression tests cover top-level and moov PSSH atoms, extended-size PSSH, malformed atom sizes, and the render input boundary. DRM-protected inputs are not supported. This is an application-level input exclusion, not a patched FFmpeg package."
     }
   ]
 }
