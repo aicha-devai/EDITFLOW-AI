@@ -45,6 +45,7 @@ def test_ffmpeg_plan_uses_resolved_paths_and_pinned_timeline_order():
     assert plan.argv.count("-format_whitelist") == 2
     assert plan.argv.count("-codec_whitelist") == 2
     assert plan.argv[plan.argv.index("-c:v") + 1] == "libx264"
+    assert "-f" not in plan.argv  # no SDL or other user-selectable output device
     assert "v4l2m2m" not in plan.argv
     assert "/media/a.mp4" in plan.argv
     assert "/media/b.mp4" in plan.argv
