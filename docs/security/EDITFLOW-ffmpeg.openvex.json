@@ -2,8 +2,8 @@
   "@context": "https://openvex.dev/ns/v0.2.0",
   "@id": "https://github.com/aicha-devai/EDITFLOW-AI/security/vex/ffmpeg-triage-2026-11-13",
   "author": "EDITFLOW Security Review",
-  "timestamp": "2026-11-15T16:15:00Z",
-  "version": 4,
+  "timestamp": "2026-11-15T18:35:00Z",
+  "version": 5,
   "statements": [
     {
       "vulnerability": {
@@ -749,6 +749,833 @@
       "status": "not_affected",
       "justification": "vulnerable_code_not_in_execute_path",
       "impact_statement": "The vulnerable DVD subtitle encoder is never selected. The renderer maps only its generated video stream and optional audio stream, explicitly encodes video with libx264 and audio with AAC, and does not map or encode subtitle streams."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-125068"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavcodec61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavdevice61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavfilter10@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavformat61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavutil59@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libpostproc58@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswresample5@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswscale8@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The vulnerable Bink video decoder path is excluded by the worker's enforced input policy. Every source is probed and opened with the MOV-only demuxer whitelist and an exact codec whitelist; Bink video decoder is not an allowed input codec/path. HEVC/AV1 hardware and OBU paths are also excluded. A regression test asserts that the supported codec set remains exact."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-125069"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavcodec61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavdevice61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavfilter10@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavformat61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavutil59@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libpostproc58@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswresample5@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswscale8@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The vulnerable Motion Pixels decoder path is excluded by the worker's enforced input policy. Every source is probed and opened with the MOV-only demuxer whitelist and an exact codec whitelist; Motion Pixels decoder is not an allowed input codec/path. HEVC/AV1 hardware and OBU paths are also excluded. A regression test asserts that the supported codec set remains exact."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-125070"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavcodec61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavdevice61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavfilter10@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavformat61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavutil59@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libpostproc58@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswresample5@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswscale8@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The vulnerable EA TQI decoder path is excluded by the worker's enforced input policy. Every source is probed and opened with the MOV-only demuxer whitelist and an exact codec whitelist; EA TQI decoder is not an allowed input codec/path. HEVC/AV1 hardware and OBU paths are also excluded. A regression test asserts that the supported codec set remains exact."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-125071"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavcodec61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavdevice61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavfilter10@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavformat61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavutil59@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libpostproc58@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswresample5@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswscale8@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The vulnerable JV decoder path is excluded by the worker's enforced input policy. Every source is probed and opened with the MOV-only demuxer whitelist and an exact codec whitelist; JV decoder is not an allowed input codec/path. HEVC/AV1 hardware and OBU paths are also excluded. A regression test asserts that the supported codec set remains exact."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-125072"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavcodec61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavdevice61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavfilter10@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavformat61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavutil59@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libpostproc58@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswresample5@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswscale8@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The vulnerable MP3 ADU decoder (distinct from the allowlisted MP3 decoder) path is excluded by the worker's enforced input policy. Every source is probed and opened with the MOV-only demuxer whitelist and an exact codec whitelist; MP3 ADU decoder (distinct from the allowlisted MP3 decoder) is not an allowed input codec/path. HEVC/AV1 hardware and OBU paths are also excluded. A regression test asserts that the supported codec set remains exact."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-125073"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavcodec61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavdevice61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavfilter10@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavformat61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavutil59@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libpostproc58@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswresample5@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswscale8@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The vulnerable IMC/IAC audio decoders path is excluded by the worker's enforced input policy. Every source is probed and opened with the MOV-only demuxer whitelist and an exact codec whitelist; IMC/IAC audio decoders is not an allowed input codec/path. HEVC/AV1 hardware and OBU paths are also excluded. A regression test asserts that the supported codec set remains exact."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-125100"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavcodec61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavdevice61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavfilter10@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavformat61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavutil59@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libpostproc58@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswresample5@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswscale8@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The vulnerable OpenEXR decoder path is excluded by the worker's enforced input policy. Every source is probed and opened with the MOV-only demuxer whitelist and an exact codec whitelist; OpenEXR decoder is not an allowed input codec/path. HEVC/AV1 hardware and OBU paths are also excluded. A regression test asserts that the supported codec set remains exact."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-125101"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavcodec61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavdevice61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavfilter10@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavformat61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavutil59@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libpostproc58@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswresample5@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswscale8@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The vulnerable VMnc decoder path is excluded by the worker's enforced input policy. Every source is probed and opened with the MOV-only demuxer whitelist and an exact codec whitelist; VMnc decoder is not an allowed input codec/path. HEVC/AV1 hardware and OBU paths are also excluded. A regression test asserts that the supported codec set remains exact."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-125102"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavcodec61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavdevice61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavfilter10@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavformat61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavutil59@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libpostproc58@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswresample5@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswscale8@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The vulnerable TAK decoder path is excluded by the worker's enforced input policy. Every source is probed and opened with the MOV-only demuxer whitelist and an exact codec whitelist; TAK decoder is not an allowed input codec/path. HEVC/AV1 hardware and OBU paths are also excluded. A regression test asserts that the supported codec set remains exact."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-125103"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavcodec61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavdevice61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavfilter10@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavformat61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavutil59@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libpostproc58@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswresample5@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswscale8@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The vulnerable MPEG-4 ALS decoder path is excluded by the worker's enforced input policy. Every source is probed and opened with the MOV-only demuxer whitelist and an exact codec whitelist; MPEG-4 ALS decoder is not an allowed input codec/path. HEVC/AV1 hardware and OBU paths are also excluded. A regression test asserts that the supported codec set remains exact."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-125104"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavcodec61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavdevice61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavfilter10@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavformat61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavutil59@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libpostproc58@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswresample5@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswscale8@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The vulnerable APE decoder path is excluded by the worker's enforced input policy. Every source is probed and opened with the MOV-only demuxer whitelist and an exact codec whitelist; APE decoder is not an allowed input codec/path. HEVC/AV1 hardware and OBU paths are also excluded. A regression test asserts that the supported codec set remains exact."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-125170"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavcodec61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavdevice61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavfilter10@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavformat61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavutil59@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libpostproc58@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswresample5@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswscale8@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The vulnerable Targa RLE decoder path is excluded by the worker's enforced input policy. Every source is probed and opened with the MOV-only demuxer whitelist and an exact codec whitelist; Targa RLE decoder is not an allowed input codec/path. HEVC/AV1 hardware and OBU paths are also excluded. A regression test asserts that the supported codec set remains exact."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-125171"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavcodec61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavdevice61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavfilter10@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavformat61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavutil59@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libpostproc58@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswresample5@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswscale8@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The vulnerable Musepack SV7 decoder path is excluded by the worker's enforced input policy. Every source is probed and opened with the MOV-only demuxer whitelist and an exact codec whitelist; Musepack SV7 decoder is not an allowed input codec/path. HEVC/AV1 hardware and OBU paths are also excluded. A regression test asserts that the supported codec set remains exact."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-125172"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavcodec61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavdevice61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavfilter10@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavformat61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavutil59@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libpostproc58@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswresample5@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswscale8@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The vulnerable EVC/libxevd decoder path is excluded by the worker's enforced input policy. Every source is probed and opened with the MOV-only demuxer whitelist and an exact codec whitelist; EVC/libxevd decoder is not an allowed input codec/path. HEVC/AV1 hardware and OBU paths are also excluded. A regression test asserts that the supported codec set remains exact."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-125173"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavcodec61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavdevice61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavfilter10@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavformat61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavutil59@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libpostproc58@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswresample5@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswscale8@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The vulnerable EVC/libxevd decoder path is excluded by the worker's enforced input policy. Every source is probed and opened with the MOV-only demuxer whitelist and an exact codec whitelist; EVC/libxevd decoder is not an allowed input codec/path. HEVC/AV1 hardware and OBU paths are also excluded. A regression test asserts that the supported codec set remains exact."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-125174"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavcodec61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavdevice61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavfilter10@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavformat61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavutil59@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libpostproc58@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswresample5@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswscale8@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The vulnerable HAP decoder path is excluded by the worker's enforced input policy. Every source is probed and opened with the MOV-only demuxer whitelist and an exact codec whitelist; HAP decoder is not an allowed input codec/path. HEVC/AV1 hardware and OBU paths are also excluded. A regression test asserts that the supported codec set remains exact."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-125175"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavcodec61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavdevice61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavfilter10@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavformat61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavutil59@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libpostproc58@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswresample5@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswscale8@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The vulnerable FlashSV decoder path is excluded by the worker's enforced input policy. Every source is probed and opened with the MOV-only demuxer whitelist and an exact codec whitelist; FlashSV decoder is not an allowed input codec/path. HEVC/AV1 hardware and OBU paths are also excluded. A regression test asserts that the supported codec set remains exact."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-125202"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavcodec61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavdevice61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavfilter10@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavformat61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavutil59@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libpostproc58@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswresample5@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswscale8@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The vulnerable VAAPI HEVC decoder path is excluded by the worker's enforced input policy. Every source is probed and opened with the MOV-only demuxer whitelist and an exact codec whitelist; VAAPI HEVC decoder is not an allowed input codec/path. HEVC/AV1 hardware and OBU paths are also excluded. A regression test asserts that the supported codec set remains exact."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-125203"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavcodec61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavdevice61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavfilter10@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavformat61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavutil59@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libpostproc58@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswresample5@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswscale8@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The vulnerable Cook multichannel decoder path is excluded by the worker's enforced input policy. Every source is probed and opened with the MOV-only demuxer whitelist and an exact codec whitelist; Cook multichannel decoder is not an allowed input codec/path. HEVC/AV1 hardware and OBU paths are also excluded. A regression test asserts that the supported codec set remains exact."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-125205"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavcodec61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavdevice61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavfilter10@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavformat61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavutil59@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libpostproc58@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswresample5@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswscale8@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The vulnerable AV1 OBU demuxer/av1_frame_merge bitstream filter path is excluded by the worker's enforced input policy. Every source is probed and opened with the MOV-only demuxer whitelist and an exact codec whitelist; AV1 OBU demuxer/av1_frame_merge bitstream filter is not an allowed input codec/path. HEVC/AV1 hardware and OBU paths are also excluded. A regression test asserts that the supported codec set remains exact."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-125206"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavcodec61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavdevice61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavfilter10@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavformat61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavutil59@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libpostproc58@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswresample5@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswscale8@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The vulnerable prores_ks encoder is never selected. The renderer's generated output is explicitly encoded with libx264 for video and AAC for audio; user input cannot select output encoders or inject an output codec."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-125207"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavcodec61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavdevice61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavfilter10@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavformat61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavutil59@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libpostproc58@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswresample5@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswscale8@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The vulnerable Interplay ACM decoder path is excluded by the worker's enforced input policy. Every source is probed and opened with the MOV-only demuxer whitelist and an exact codec whitelist; Interplay ACM decoder is not an allowed input codec/path. HEVC/AV1 hardware and OBU paths are also excluded. A regression test asserts that the supported codec set remains exact."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-74860"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/libxml2@2.12.7%2Bdfsg%2Breally2.9.14-2.1%2Bdeb13u3?arch=amd64&distro=debian-13"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "This issue requires libxml2's Python bindings. The Worker SBOM contains the libxml2 shared library but no python3-libxml2 package, Python libxml2 module, or lxml component; the application requirements also contain no libxml2 Python binding. The vulnerable SAX binding callback is therefore not present in the deployed image."
     }
   ]
 }
