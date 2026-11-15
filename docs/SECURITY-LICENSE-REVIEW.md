@@ -80,7 +80,7 @@ Debian Forky is still the testing distribution as of 2026-11-15 and is not manag
 
 ## Debian package attack-surface reductions
 
-- The shared runtime base purges ncurses-bin so the vulnerable infocmp executable is not shipped.
+- The shared runtime base removes /usr/bin/infocmp while retaining the essential ncurses-bin package; CI verifies the vulnerable executable is absent.
 - CI verifies Archive::Tar is not importable from the installed minimal Perl runtime.
 - CI verifies systemd-homed binaries are absent; the containers use the static EDITFLOW account rather than homed-managed users.
 - Exact package PURLs are recorded in OpenVEX as not_affected only for these runtime images. The statements must be removed if the relevant code becomes present or reachable.
