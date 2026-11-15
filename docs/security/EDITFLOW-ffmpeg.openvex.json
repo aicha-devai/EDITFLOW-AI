@@ -2,8 +2,8 @@
   "@context": "https://openvex.dev/ns/v0.2.0",
   "@id": "https://github.com/aicha-devai/EDITFLOW-AI/security/vex/ffmpeg-triage-2026-11-13",
   "author": "EDITFLOW Security Review",
-  "timestamp": "2026-11-15T14:30:00Z",
-  "version": 3,
+  "timestamp": "2026-11-15T16:15:00Z",
+  "version": 4,
   "statements": [
     {
       "vulnerability": {
@@ -675,6 +675,80 @@
       "status": "not_affected",
       "justification": "vulnerable_code_not_in_execute_path",
       "impact_statement": "The vulnerability is in the systemd-homed account-management daemon. Neither systemd-homed executable nor service is installed in the runtime images; EDITFLOW uses a static /etc/passwd account and does not configure the systemd NSS module. CI verifies the homed executables are absent."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-125204"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavcodec61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavdevice61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavfilter10@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavformat61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavutil59@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libpostproc58@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswresample5@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswscale8@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The vulnerable libwebp encoder is never selected. The renderer maps only its generated video stream and optional audio stream, then explicitly encodes video with libx264 and audio with AAC; callers cannot choose output encoders or supply custom filter graphs."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-125209"
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/ffmpeg@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavcodec61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavdevice61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavfilter10@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavformat61@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libavutil59@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libpostproc58@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswresample5@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        },
+        {
+          "@id": "pkg:deb/debian/libswscale8@7.1.5-0%2Bdeb13u1?arch=amd64&distro=debian-13.7&epoch=7"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The vulnerable DVD subtitle encoder is never selected. The renderer maps only its generated video stream and optional audio stream, explicitly encodes video with libx264 and audio with AAC, and does not map or encode subtitle streams."
     }
   ]
 }
